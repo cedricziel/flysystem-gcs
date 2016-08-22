@@ -1,0 +1,29 @@
+{
+    "name": "cedricziel/flysystem-gcs",
+    "description": "Flysystem adapter for Google Cloud Storage (GCS) that uses gcloud-php",
+    "type": "library",
+    "require": {
+        "google/cloud": "^0.6.0",
+        "league/flysystem": "^1.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^5.5"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Cedric Ziel",
+            "email": "cedric@cedric-ziel.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "CedricZiel\\FlysystemGcs\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CedricZiel\\FlysystemGcs\\Tests\\": "tests"
+        }
+    }
+}
