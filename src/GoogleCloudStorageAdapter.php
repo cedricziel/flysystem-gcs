@@ -3,6 +3,7 @@
 namespace CedricZiel\FlysystemGcs;
 
 use Google\Cloud\Storage\Bucket;
+use Google\Cloud\Storage\Object;
 use Google\Cloud\Storage\StorageClient;
 use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\Config;
@@ -60,7 +61,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function write($path, $contents, Config $config)
     {
-        // TODO: Implement write() method.
+        $object = new Object();
     }
 
     /**
@@ -227,7 +228,11 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function listContents($directory = '', $recursive = false)
     {
-        // TODO: Implement listContents() method.
+        $contents = $this->bucket->objects(
+            [
+                'prefix' => $directory,
+            ]
+        );
     }
 
     /**
