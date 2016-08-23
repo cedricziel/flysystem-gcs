@@ -3,13 +3,33 @@
 namespace CedricZiel\FlysystemGcs;
 
 use Google\Cloud\Storage\Bucket;
-use Google\Cloud\Storage\Object;
+use Google\Cloud\Storage\Object as StorageObject;
 use Google\Cloud\Storage\StorageClient;
 use League\Flysystem\Adapter\AbstractAdapter;
+use League\Flysystem\AdapterInterface;
 use League\Flysystem\Config;
 
+/**
+ * Flysystem Adapter for Google Cloud Storage.
+ * Permissions:
+ * Flysystem mostly uses 2 different types of visibility: public and private. This adapter maps those
+ * to either grant project-private access or public access. The default is `projectPrivate`
+ * For using a more appropriate ACL for a specific use-case, the
+ *
+ * @see AdapterInterface
+ */
 class GoogleCloudStorageAdapter extends AbstractAdapter
 {
+    /**
+     * ACL that grants access to everyone on the project
+     */
+    const GCS_VISIBILITY_PROJECT_PRIVATE = 'projectPrivate';
+
+    /**
+     * ACL that grants public read access to everyone
+     */
+    const GCS_VISIBILITY_PUBLIC_READ = 'publicRead';
+
     /**
      * @var Bucket
      */
@@ -61,7 +81,17 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function write($path, $contents, Config $config)
     {
-        $object = new Object();
+        $path = ltrim($path, '/');
+        $metadata = [
+            'name' => $path,
+        ];
+
+        $metadata += $this->getOptionsFromConfig($config);
+
+        $uploadedObject = $this->bucket->upload($contents, $metadata);
+        $uploadedObject->reload();
+
+        return $this->convertObjectInfo($uploadedObject);
     }
 
     /**
@@ -75,7 +105,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function writeStream($path, $resource, Config $config)
     {
-        // TODO: Implement writeStream() method.
+        return $this->write($path, $resource, $config);
     }
 
     /**
@@ -89,7 +119,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function update($path, $contents, Config $config)
     {
-        // TODO: Implement update() method.
+        return $this->write($path, $contents, $config);
     }
 
     /**
@@ -103,7 +133,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function updateStream($path, $resource, Config $config)
     {
-        // TODO: Implement updateStream() method.
+        return $this->update($path, $resource, $config);
     }
 
     /**
@@ -116,7 +146,10 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function rename($path, $newpath)
     {
-        // TODO: Implement rename() method.
+        $statusCopy = $this->copy($path, $newpath);
+        $statusRemoveOld = $this->delete($path);
+
+        return $statusCopy && $statusRemoveOld;
     }
 
     /**
@@ -129,7 +162,15 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function copy($path, $newpath)
     {
-        // TODO: Implement copy() method.
+        $path = $this->sanitizePath($path);
+        $newpath = $this->sanitizePath($newpath);
+
+        $tmpFile = tmpfile();
+        // TODO: is streaming the better option?
+        $this->bucket->object($path)->downloadToFile($tmpFile);
+        $this->bucket->upload($tmpFile, ['name' => $newpath]);
+
+        return $this->bucket->object($newpath)->exists();
     }
 
     /**
@@ -141,7 +182,17 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function delete($path)
     {
-        // TODO: Implement delete() method.
+        $object = $this->bucket->object($path);
+
+        if (!$object->exists()) {
+            return true;
+        }
+
+        $object->delete();
+
+        $object->reload();
+
+        return $object->exists();
     }
 
     /**
@@ -153,7 +204,12 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function deleteDir($dirname)
     {
-        // TODO: Implement deleteDir() method.
+        $path = $this->sanitizePath($dirname);
+        $path = rtrim($path, '/').'/';
+
+        $this->bucket->object($path)->delete();
+
+        return !$this->bucket->object($path)->exists();
     }
 
     /**
@@ -166,7 +222,12 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function createDir($dirname, Config $config)
     {
-        // TODO: Implement createDir() method.
+        $path = $this->sanitizePath($dirname);
+        $path = rtrim($path, '/').'/';
+
+        $object = $this->bucket->upload('', ['name' => $path]);
+
+        return $this->convertObjectInfo($object);
     }
 
     /**
@@ -179,7 +240,25 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function setVisibility($path, $visibility)
     {
-        // TODO: Implement setVisibility() method.
+        $path = $this->sanitizePath($path);
+        $object = $this->bucket->object($path);
+
+        switch (true) {
+            case $visibility === AdapterInterface::VISIBILITY_PUBLIC:
+                $computedVisibility = 'READER';
+                $object->acl()->add('allUsers', $computedVisibility);
+                break;
+            case $visibility === AdapterInterface::VISIBILITY_PRIVATE:
+                $object->acl()->delete('allUsers');
+                break;
+            default:
+                // invalid value
+                break;
+        }
+
+        $object->reload();
+
+        return $this->convertObjectInfo($object);
     }
 
     /**
@@ -191,7 +270,10 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function has($path)
     {
-        // TODO: Implement has() method.
+        $path = $this->sanitizePath($path);
+        $object = $this->bucket->object($path);
+
+        return $object->exists();
     }
 
     /**
@@ -203,7 +285,11 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function read($path)
     {
-        // TODO: Implement read() method.
+        $path = $this->sanitizePath($path);
+
+        $object = $this->bucket->object($path);
+
+        return $object->downloadAsString();
     }
 
     /**
@@ -228,11 +314,41 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function listContents($directory = '', $recursive = false)
     {
-        $contents = $this->bucket->objects(
+        $directory = $this->sanitizePath($directory);
+
+        /*
+         * If list scope is a directory, make sure we actually emulate a hierarchical filesystem.
+         *
+         * When list contents is called with $directory set, the intention is to only find contents *in*
+         * a directory. To strengthen the intent, the directory separator is added.
+         */
+        if ('' !== $directory) {
+            $directory = rtrim($directory, '/').'/';
+        }
+
+
+        $objects = $this->bucket->objects(
             [
                 'prefix' => $directory,
             ]
         );
+
+        $contents = [];
+        foreach ($objects as $apiObject) {
+            $contents[] = $this->convertObjectInfo($apiObject);
+        }
+
+        // if directory, skip the directory object
+        // if directory, truncate prefix + delimiter
+        if ('' !== $directory) {
+            foreach ($contents as $idx => $objectInfo) {
+                if ('dir' === $objectInfo['type'] && $objectInfo['path'] === $directory) {
+                    $contents[$idx] = false;
+                }
+            }
+        }
+
+        return array_filter($contents);
     }
 
     /**
@@ -244,7 +360,15 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function getMetadata($path)
     {
-        // TODO: Implement getMetadata() method.
+        $path = $this->sanitizePath($path);
+
+        $object = $this->bucket->object($path);
+
+        if (!$object->exists()) {
+            return false;
+        }
+
+        return $this->convertObjectInfo($object);
     }
 
     /**
@@ -256,7 +380,8 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function getSize($path)
     {
-        // TODO: Implement getSize() method.
+
+        return $this->getMetadata($path);
     }
 
     /**
@@ -268,7 +393,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function getMimetype($path)
     {
-        // TODO: Implement getMimetype() method.
+        return $this->getMetadata($path);
     }
 
     /**
@@ -280,7 +405,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function getTimestamp($path)
     {
-        // TODO: Implement getTimestamp() method.
+        return $this->getMetadata($path);
     }
 
     /**
@@ -292,6 +417,71 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function getVisibility($path)
     {
-        // TODO: Implement getVisibility() method.
+        return $this->getMetadata($path);
+    }
+
+    /**
+     * @param $object StorageObject
+     *
+     * @return array
+     */
+    protected function convertObjectInfo($object)
+    {
+        $identity = $object->identity();
+        $objectInfo = $object->info();
+        $objectName = $identity['object'];
+
+        // determine whether it's a file or a directory
+        $type = 'file';
+        $objectNameLength = strlen($objectName);
+        if (strpos($objectName, '/', $objectNameLength - 1)) {
+            $type = 'dir';
+        }
+
+        $normalizedObjectInfo = [
+            'type' => $type,
+            'path' => $objectName,
+        ];
+
+        // timestamp
+        $datetime = \DateTime::createFromFormat('Y-m-d\TH:i:s+', $objectInfo['updated']);
+        $normalizedObjectInfo['timestamp'] = $datetime->getTimestamp();
+
+        // size when file
+        if ($type === 'file') {
+            $normalizedObjectInfo['size'] = $objectInfo['size'];
+        }
+
+        return $normalizedObjectInfo;
+    }
+
+    /**
+     * Converts flysystem specific config to options for the underlying API client
+     *
+     * @param $config Config
+     *
+     * @return array
+     */
+    protected function getOptionsFromConfig(Config $config)
+    {
+        $options = [];
+
+        if ($config->has('visibility')) {
+            $options['predefinedAcl'] = $config->get('visibility');
+        } else {
+            $options['predefinedAcl'] = static::GCS_VISIBILITY_PROJECT_PRIVATE;
+        }
+
+        return $options;
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return string
+     */
+    protected function sanitizePath($path)
+    {
+        return ltrim($path, '/');
     }
 }

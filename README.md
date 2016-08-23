@@ -20,6 +20,7 @@ $filesystem = new Filesystem($adapter);
 ## ToDo
 
 * allow path prefixes (subdirectories as mount)
+* get copy and rename operations right
 
 ## License
 
