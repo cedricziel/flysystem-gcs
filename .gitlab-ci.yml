@@ -1,0 +1,20 @@
+image: cedricziel/docker-php-tools:7.0
+
+before_script:
+  # install dependencies
+  - composer config cache-files-dir .composercache
+  - composer install --no-interaction
+  - echo $GCS_PRIVATE_KEY > res/test-key.json
+
+cache:
+  paths:
+    - .composercache
+  key: flysystem_gcs
+
+stages:
+  - test
+
+test:
+  stage: test
+  script:
+    - php vendor/bin/phpunit --coverage-text --colors=never
