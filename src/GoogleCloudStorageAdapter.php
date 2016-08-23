@@ -2,6 +2,7 @@
 
 namespace CedricZiel\FlysystemGcs;
 
+use Google\Cloud\Storage\Acl;
 use Google\Cloud\Storage\Bucket;
 use Google\Cloud\Storage\Object as StorageObject;
 use Google\Cloud\Storage\StorageClient;
@@ -245,8 +246,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
 
         switch (true) {
             case $visibility === AdapterInterface::VISIBILITY_PUBLIC:
-                $computedVisibility = 'READER';
-                $object->acl()->add('allUsers', $computedVisibility);
+                $object->acl()->add('allUsers', Acl::ROLE_READER);
                 break;
             case $visibility === AdapterInterface::VISIBILITY_PRIVATE:
                 $object->acl()->delete('allUsers');
