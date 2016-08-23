@@ -1,6 +1,14 @@
 {
     "name": "cedricziel/flysystem-gcs",
     "description": "Flysystem adapter for Google Cloud Storage (GCS) that uses gcloud-php",
+    "keywords": [
+        "flysystem",
+        "cloud",
+        "filesystem",
+        "google",
+        "gcs",
+        "google cloud storage"
+    ],
     "type": "library",
     "require": {
         "google/cloud": "^0.6.0",
