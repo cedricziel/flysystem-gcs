@@ -19,6 +19,17 @@ $adapter = new GoogleCloudStorageAdapter($storageClientOptions);
 $filesystem = new Filesystem($adapter);
 ```
 
+## Development
+
+Some tests require actual access to GCS. They can be configured through
+the environment.
+
+| variable | meaning |
+|----------|---------|
+| GOOGLE_APPLICATION_CREDENTIALS | absolute path to the service account credentials *.json file |
+| GCLOUD_BUCKET | name of the bucket to perform the tests on |
+| GCLOUD_PROJECT | the cloud project to use |
+
 ## ToDo
 
 * allow path prefixes (subdirectories as mount)
