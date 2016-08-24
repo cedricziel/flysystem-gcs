@@ -21,7 +21,7 @@ $filesystem = new Filesystem($adapter);
 
 ## Demo
 
-There's [demo project](https://github.com/cedricziel/flysystem-gcs-demo) that shows simple operations in a file system manager.
+There's [a demo project](https://github.com/cedricziel/flysystem-gcs-demo) that shows simple operations in a file system manager.
 
 ## Development
 
