@@ -19,6 +19,10 @@ $adapter = new GoogleCloudStorageAdapter($storageClientOptions);
 $filesystem = new Filesystem($adapter);
 ```
 
+## Demo
+
+There's [demo project](https://github.com/cedricziel/flysystem-gcs-demo) that shows simple operations in a file system manager.
+
 ## Development
 
 Some tests require actual access to GCS. They can be configured through
