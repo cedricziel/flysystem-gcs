@@ -11,7 +11,7 @@
     ],
     "type": "library",
     "require": {
-        "google/cloud": "dev-master",
+        "google/cloud": "dev-master#e1b1e065d4c157850cf46b2ab4a637f713a38dcb",
         "league/flysystem": "^1.0"
     },
     "require-dev": {
