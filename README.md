@@ -1,6 +1,6 @@
 # flysystem-gcs - Flysystem Adapter for Google Cloud Storage
 
-[![build status](https://gitlab.com/cedricziel/flysystem-gcs/badges/master/build.svg)](https://gitlab.com/cedricziel/flysystem-gcs/commits/master)
+[![build status](https://gitlab.com/cedricziel/flysystem-gcs/badges/master/build.svg)](https://gitlab.com/cedricziel/flysystem-gcs/commits/master) [![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/cedricziel/flysystem-gcs/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/cedricziel/flysystem-gcs/?branch=master)
 
 Flysystem Adapter for Google cloud storage using the gcloud PHP library
 
