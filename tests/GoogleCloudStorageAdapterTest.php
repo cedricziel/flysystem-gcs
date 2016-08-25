@@ -179,4 +179,19 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($adapter->delete($destinationPath));
         $this->assertFalse($adapter->has($destinationPath));
     }
+
+    /**
+     * @test
+     */
+    public function testDeletingNonExistentObjectsWillNotFail()
+    {
+        $minimalConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $minimalConfig);
+
+        $this->assertTrue($adapter->delete('no_file_in_storage.txt'));
+    }
 }
