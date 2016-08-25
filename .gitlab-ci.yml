@@ -17,4 +17,6 @@ stages:
 test:
   stage: test
   script:
-    - php vendor/bin/phpunit --coverage-text --colors=never
+    - php vendor/bin/phpunit --coverage-text --coverage-clover=coverage.clover --colors=never
+    - wget https://scrutinizer-ci.com/ocular.phar
+    - php ocular.phar code-coverage:upload --format=php-clover coverage.clover
