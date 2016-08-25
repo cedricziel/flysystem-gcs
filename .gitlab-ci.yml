@@ -3,7 +3,7 @@ image: cedricziel/docker-php-tools:7.0
 before_script:
   # install dependencies
   - composer config cache-files-dir .composercache
-  - composer install --no-interaction
+  - composer install --no-interaction --prefer-dist
   - echo $GCS_PRIVATE_KEY > res/test-key.json
 
 cache:
@@ -19,4 +19,4 @@ test:
   script:
     - php vendor/bin/phpunit --coverage-text --coverage-clover=coverage.clover --colors=never
     - wget https://scrutinizer-ci.com/ocular.phar
-    - php ocular.phar code-coverage:upload --format=php-clover coverage.clover
+    - php ocular.phar code-coverage:upload --repository=g/cedricziel/flysystem-gcs --format=php-clover coverage.clover
