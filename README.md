@@ -10,11 +10,12 @@ Flysystem Adapter for Google cloud storage using the gcloud PHP library
 use CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter;
 use League\Flysystem\Filesystem;
 
-$storageClientOptions = [
+$adapterOptions = [
     'projectId' => 'my-project-id',
-    'bucket' => 'my-project-bucket.appspot.com'
+    'bucket'    => 'my-project-bucket.appspot.com',
+    'prefix'    => 'my-path-prefix/inside/the/bucket',
 ];
-$adapter = new GoogleCloudStorageAdapter($storageClientOptions);
+$adapter = new GoogleCloudStorageAdapter(null, $adapterOptions);
 
 $filesystem = new Filesystem($adapter);
 ```
@@ -36,7 +37,6 @@ the environment.
 
 ## ToDo
 
-* allow path prefixes (subdirectories as mount)
 * get copy and rename operations right
 
 ## License

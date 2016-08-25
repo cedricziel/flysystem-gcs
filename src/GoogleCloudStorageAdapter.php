@@ -69,6 +69,13 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         }
 
         $this->bucket = $this->storageClient->bucket($config['bucket']);
+
+        // The adapter can optionally use a prefix. If it's not set, the bucket root is used
+        if (array_key_exists('prefix', $config)) {
+            $this->setPathPrefix($config['prefix']);
+        } else {
+            $this->setPathPrefix('/');
+        }
     }
 
     /**
@@ -82,7 +89,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function write($path, $contents, Config $config)
     {
-        $path = ltrim($path, '/');
+        $path = $this->applyPathPrefix($path);
         $metadata = [
             'name' => $path,
         ];
@@ -163,8 +170,8 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function copy($path, $newpath)
     {
-        $path = $this->sanitizePath($path);
-        $newpath = $this->sanitizePath($newpath);
+        $path = $this->applyPathPrefix($path);
+        $newpath = $this->applyPathPrefix($path);
 
         $tmpFile = tmpfile();
         // TODO: is streaming the better option?
@@ -183,6 +190,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function delete($path)
     {
+        $path = $this->applyPathPrefix($path);
         $object = $this->bucket->object($path);
 
         if (!$object->exists()) {
@@ -205,12 +213,17 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function deleteDir($dirname)
     {
-        $path = $this->sanitizePath($dirname);
-        $path = rtrim($path, '/').'/';
+        $dirname = rtrim($dirname, '/').'/';
 
-        $this->bucket->object($path)->delete();
+        if (false === $this->has($dirname)) {
+            return false;
+        }
 
-        return !$this->bucket->object($path)->exists();
+        $dirname = $this->applyPathPrefix($dirname);
+
+        $this->bucket->object($dirname)->delete();
+
+        return !$this->bucket->object($dirname)->exists();
     }
 
     /**
@@ -223,7 +236,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function createDir($dirname, Config $config)
     {
-        $path = $this->sanitizePath($dirname);
+        $path = $this->applyPathPrefix($dirname);
         $path = rtrim($path, '/').'/';
 
         $object = $this->bucket->upload('', ['name' => $path]);
@@ -241,7 +254,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function setVisibility($path, $visibility)
     {
-        $path = $this->sanitizePath($path);
+        $path = $this->applyPathPrefix($path);
         $object = $this->bucket->object($path);
 
         switch (true) {
@@ -270,7 +283,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function has($path)
     {
-        $path = $this->sanitizePath($path);
+        $path = $this->applyPathPrefix($path);
         $object = $this->bucket->object($path);
 
         return $object->exists();
@@ -285,7 +298,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function read($path)
     {
-        $path = $this->sanitizePath($path);
+        $path = $this->applyPathPrefix($path);
 
         $object = $this->bucket->object($path);
 
@@ -314,7 +327,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function listContents($directory = '', $recursive = false)
     {
-        $directory = $this->sanitizePath($directory);
+        $directory = $this->applyPathPrefix($directory);
 
         /*
          * If list scope is a directory, make sure we actually emulate a hierarchical filesystem.
@@ -326,6 +339,9 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
             $directory = rtrim($directory, '/').'/';
         }
 
+        if ('/' !== $directory) {
+            $directory = ltrim($directory, '/');
+        }
 
         $objects = $this->bucket->objects(
             [
@@ -360,7 +376,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function getMetadata($path)
     {
-        $path = $this->sanitizePath($path);
+        $path = $this->applyPathPrefix($path);
 
         $object = $this->bucket->object($path);
 
@@ -473,15 +489,5 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         }
 
         return $options;
-    }
-
-    /**
-     * @param string $path
-     *
-     * @return string
-     */
-    protected function sanitizePath($path)
-    {
-        return ltrim($path, '/');
     }
 }
