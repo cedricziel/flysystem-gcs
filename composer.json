@@ -11,7 +11,7 @@
     ],
     "type": "library",
     "require": {
-        "google/cloud": "^0.6.0",
+        "google/cloud": "dev-listEmptyBucket",
         "league/flysystem": "^1.0"
     },
     "require-dev": {
@@ -33,5 +33,8 @@
         "psr-4": {
             "CedricZiel\\FlysystemGcs\\Tests\\": "tests"
         }
-    }
+    },
+    "repositories": [
+        {"type": "vcs", "url": "https://github.com/cedricziel/gcloud-php"}
+    ]
 }
