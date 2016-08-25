@@ -79,6 +79,16 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function setPathPrefix($prefix)
+    {
+        parent::setPathPrefix($prefix);
+
+        $this->pathPrefix = ltrim($prefix, '/');
+    }
+
+    /**
      * Write a new file.
      *
      * @param string $path
@@ -193,15 +203,13 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         $path = $this->applyPathPrefix($path);
         $object = $this->bucket->object($path);
 
-        if (!$object->exists()) {
+        if (false === $object->exists()) {
             return true;
         }
 
         $object->delete();
 
-        $object->reload();
-
-        return $object->exists();
+        return !$object->exists();
     }
 
     /**
@@ -329,29 +337,15 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
     {
         $directory = $this->applyPathPrefix($directory);
 
-        /*
-         * If list scope is a directory, make sure we actually emulate a hierarchical filesystem.
-         *
-         * When list contents is called with $directory set, the intention is to only find contents *in*
-         * a directory. To strengthen the intent, the directory separator is added.
-         */
-        if ('' !== $directory) {
-            $directory = rtrim($directory, '/').'/';
-        }
-
-        if ('/' !== $directory) {
-            $directory = ltrim($directory, '/');
-        }
-
-        $objects = $this->bucket->objects(
-            [
-                'prefix' => $directory,
-            ]
-        );
+        $objects = $this->bucket->objects([
+            'prefix' => $directory
+        ]);
 
         $contents = [];
         foreach ($objects as $apiObject) {
-            $contents[] = $this->convertObjectInfo($apiObject);
+            if (null !== $apiObject) {
+                $contents[] = $this->convertObjectInfo($apiObject);
+            }
         }
 
         // if directory, skip the directory object
@@ -466,6 +460,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         // size when file
         if ($type === 'file') {
             $normalizedObjectInfo['size'] = $objectInfo['size'];
+            $normalizedObjectInfo['mimetype'] = $objectInfo['contentType'];
         }
 
         return $normalizedObjectInfo;
