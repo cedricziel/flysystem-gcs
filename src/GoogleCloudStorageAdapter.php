@@ -74,18 +74,8 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         if (array_key_exists('prefix', $config)) {
             $this->setPathPrefix($config['prefix']);
         } else {
-            $this->setPathPrefix('/');
+            $this->setPathPrefix('');
         }
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function setPathPrefix($prefix)
-    {
-        parent::setPathPrefix($prefix);
-
-        $this->pathPrefix = ltrim($prefix, '/');
     }
 
     /**
@@ -337,9 +327,11 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
     {
         $directory = $this->applyPathPrefix($directory);
 
-        $objects = $this->bucket->objects([
-            'prefix' => $directory
-        ]);
+        $objects = $this->bucket->objects(
+            [
+                'prefix' => $directory,
+            ]
+        );
 
         $contents = [];
         foreach ($objects as $apiObject) {
@@ -390,7 +382,6 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function getSize($path)
     {
-
         return $this->getMetadata($path);
     }
 

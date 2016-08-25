@@ -160,7 +160,11 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
             $adapter->getMetadata($destinationPath)['type'],
             'The object type is interpreted correctly'
         );
-        $this->assertEquals('text/plain', $adapter->getMimetype($destinationPath)['mimetype'], 'The mime type is available');
+        $this->assertEquals(
+            'text/plain',
+            $adapter->getMimetype($destinationPath)['mimetype'],
+            'The mime type is available'
+        );
         $this->assertEquals(
             11,
             $adapter->getSize($destinationPath)['size'],
@@ -193,5 +197,38 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $adapter = new GoogleCloudStorageAdapter(null, $minimalConfig);
 
         $this->assertTrue($adapter->delete('no_file_in_storage.txt'));
+    }
+
+    /**
+     * @test
+     */
+    public function testPrefixesCanBeUsed()
+    {
+        $simpleConfig = new Config([]);
+        $prefixedAdapterConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+            'prefix'    => 'my/prefix/',
+        ];
+
+        $prefixedAdapter = new GoogleCloudStorageAdapter(null, $prefixedAdapterConfig);
+
+        $unprefixedAdapterConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $unprefixedAdapter = new GoogleCloudStorageAdapter(null, $unprefixedAdapterConfig);
+
+        $path = 'test.txt';
+        $contents = 'This is just a simple melody....';
+        $prefixedAdapter->write($path, $contents, $simpleConfig);
+        $this->assertTrue($prefixedAdapter->has($path));
+        $this->assertEquals($contents, $prefixedAdapter->read($path));
+
+        $this->assertTrue($prefixedAdapter->has($path));
+        $this->assertTrue($unprefixedAdapter->has('my/prefix/'.$path));
+
+        $this->assertTrue($prefixedAdapter->delete($path));
     }
 }
