@@ -11,7 +11,7 @@
     ],
     "type": "library",
     "require": {
-        "google/cloud": "dev-master#e1b1e065d4c157850cf46b2ab4a637f713a38dcb",
+        "google/cloud": "dev-master",
         "league/flysystem": "^1.0"
     },
     "require-dev": {
@@ -33,5 +33,8 @@
         "psr-4": {
             "CedricZiel\\FlysystemGcs\\Tests\\": "tests"
         }
-    }
+    },
+    "repositories": [
+        {"type": "vcs", "url": "https://github.com/GoogleCloudPlatform/google-cloud-php.git"}
+    ]
 }
