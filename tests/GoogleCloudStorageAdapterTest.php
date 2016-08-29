@@ -261,4 +261,54 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($fs->delete($destinationPath), 'Files can be removed without errors');
         $this->assertFalse($fs->has($destinationPath), 'They are gone after the previous operation');
     }
+
+    /**
+     * @test
+     */
+    public function testVisibilityCanBeSetOnWrite()
+    {
+        $testId = uniqid('', true);
+        $destinationPathPrivate = "/test_content{$testId}/test-private.txt";
+        $destinationPathPublic = "/test_content{$testId}/test-public.txt";
+
+        $adapterConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+
+        $fs = new Filesystem($adapter);
+        $contents = 'This is just a simple melody....';
+
+        // Test pre-setting private visibility
+        $fs->write(
+            $destinationPathPrivate,
+            $contents,
+            [
+                'visibility' => AdapterInterface::VISIBILITY_PRIVATE,
+            ]
+        );
+
+        $data = $fs->read($destinationPathPrivate);
+
+        $this->assertEquals($contents, $data);
+        $this->assertTrue($fs->has($destinationPathPrivate));
+        $this->assertEquals(AdapterInterface::VISIBILITY_PRIVATE, $fs->getVisibility($destinationPathPrivate));
+
+        // Test pre-setting public visibility
+        $fs->write(
+            $destinationPathPublic,
+            $contents,
+            [
+                'visibility' => AdapterInterface::VISIBILITY_PUBLIC,
+            ]
+        );
+
+        $data = $fs->read($destinationPathPublic);
+
+        $this->assertEquals($contents, $data);
+        $this->assertTrue($fs->has($destinationPathPublic));
+        $this->assertEquals(AdapterInterface::VISIBILITY_PUBLIC, $fs->getVisibility($destinationPathPublic));
+    }
 }

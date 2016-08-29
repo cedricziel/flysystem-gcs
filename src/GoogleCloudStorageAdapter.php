@@ -2,6 +2,7 @@
 
 namespace CedricZiel\FlysystemGcs;
 
+use Google\Cloud\Exception\NotFoundException;
 use Google\Cloud\Storage\Acl;
 use Google\Cloud\Storage\Bucket;
 use Google\Cloud\Storage\Object as StorageObject;
@@ -420,7 +421,19 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function getVisibility($path)
     {
-        return $this->getMetadata($path);
+        $path = $this->applyPathPrefix($path);
+
+        try {
+            $allUsersAcl = $this->bucket->object($path)->acl()->get(['entity' => 'allUsers']);
+
+            if ($allUsersAcl['role'] === Acl::ROLE_READER) {
+                return ['path' => $path, 'visibility' => AdapterInterface::VISIBILITY_PUBLIC];
+            }
+        } catch (NotFoundException $e) {
+            return ['path' => $path, 'visibility' => AdapterInterface::VISIBILITY_PRIVATE];
+        }
+
+        return ['path' => $path, 'visibility' => AdapterInterface::VISIBILITY_PRIVATE];
     }
 
     /**
@@ -471,9 +484,15 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         $options = [];
 
         if ($config->has('visibility')) {
-            $options['predefinedAcl'] = $config->get('visibility');
-        } else {
-            $options['predefinedAcl'] = static::GCS_VISIBILITY_PROJECT_PRIVATE;
+            switch (true) {
+                case $config->get('visibility') === AdapterInterface::VISIBILITY_PUBLIC:
+                    $options['predefinedAcl'] = static::GCS_VISIBILITY_PUBLIC_READ;
+                    break;
+                case $config->get('visibility') === AdapterInterface::VISIBILITY_PRIVATE:
+                default:
+                    $options['predefinedAcl'] = static::GCS_VISIBILITY_PROJECT_PRIVATE;
+                    break;
+            }
         }
 
         return $options;
