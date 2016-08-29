@@ -300,7 +300,9 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
 
         $object = $this->bucket->object($path);
 
-        return $object->downloadAsString();
+        $contents = $object->downloadAsString();
+
+        return compact('path', 'contents');
     }
 
     /**

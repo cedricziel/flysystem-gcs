@@ -5,6 +5,7 @@ namespace CedricZiel\FlysystemGcs\Tests;
 use CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\Config;
+use League\Flysystem\Filesystem;
 
 class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
 {
@@ -230,5 +231,34 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($unprefixedAdapter->has('my/prefix/'.$path));
 
         $this->assertTrue($prefixedAdapter->delete($path));
+    }
+
+    /**
+     * @test
+     */
+    public function testCanBeWrappedWithAFilesystem()
+    {
+        $testId = uniqid('', true);
+        $destinationPath = "/test_content{$testId}/test.txt";
+
+        $adapterConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+
+        $fs = new Filesystem($adapter);
+        $contents = 'This is just a simple melody....';
+
+        $fs->write($destinationPath, $contents);
+
+        $data = $fs->read($destinationPath);
+
+        $this->assertEquals($contents, $data);
+        $this->assertTrue($fs->has($destinationPath));
+
+        $this->assertTrue($fs->delete($destinationPath), 'Files can be removed without errors');
+        $this->assertFalse($fs->has($destinationPath), 'They are gone after the previous operation');
     }
 }
