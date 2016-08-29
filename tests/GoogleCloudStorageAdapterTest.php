@@ -153,7 +153,7 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($adapter->has($destinationPath), 'Once writte, the adapter can see the object in GCS');
         $this->assertEquals(
             $content,
-            $adapter->read($destinationPath),
+            $adapter->read($destinationPath)['contents'],
             'The content of the GCS object matches exactly the input'
         );
         $this->assertEquals(
@@ -225,7 +225,7 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $contents = 'This is just a simple melody....';
         $prefixedAdapter->write($path, $contents, $simpleConfig);
         $this->assertTrue($prefixedAdapter->has($path));
-        $this->assertEquals($contents, $prefixedAdapter->read($path));
+        $this->assertEquals($contents, $prefixedAdapter->read($path)['contents']);
 
         $this->assertTrue($prefixedAdapter->has($path));
         $this->assertTrue($unprefixedAdapter->has('my/prefix/'.$path));
