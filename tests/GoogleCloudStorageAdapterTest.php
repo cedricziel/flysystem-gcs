@@ -314,4 +314,30 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($fs->has($destinationPathPublic));
         $this->assertEquals(AdapterInterface::VISIBILITY_PUBLIC, $fs->getVisibility($destinationPathPublic));
     }
+
+    /**
+     * @test
+     */
+    public function testCanUpdateAFile()
+    {
+        $testId = uniqid('', true);
+        $destination = "/test_content{$testId}/test.txt";
+        $initialContent = 'Foo';
+        $updatedContent = 'Bar';
+
+        $adapterConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+
+        $fs = new Filesystem($adapter);
+
+        $fs->put($destination, $initialContent);
+        $this->assertTrue($fs->has($destination));
+        $this->assertTrue($fs->update($destination, $updatedContent));
+        $this->assertEquals($updatedContent, $fs->read($destination));
+        $this->assertTrue($fs->delete($destination));
+    }
 }
