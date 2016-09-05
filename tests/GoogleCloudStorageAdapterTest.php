@@ -205,11 +205,14 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
      */
     public function testPrefixesCanBeUsed()
     {
+        $testId = uniqid();
+        $testPrefix = "my/prefix/{$testId}/";
+
         $simpleConfig = new Config([]);
         $prefixedAdapterConfig = [
             'bucket'    => $this->bucket,
             'projectId' => $this->project,
-            'prefix'    => 'my/prefix/',
+            'prefix'    => $testPrefix,
         ];
 
         $prefixedAdapter = new GoogleCloudStorageAdapter(null, $prefixedAdapterConfig);
@@ -228,7 +231,7 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($contents, $prefixedAdapter->read($path)['contents']);
 
         $this->assertTrue($prefixedAdapter->has($path));
-        $this->assertTrue($unprefixedAdapter->has('my/prefix/'.$path));
+        $this->assertTrue($unprefixedAdapter->has($testPrefix.$path));
 
         $this->assertTrue($prefixedAdapter->delete($path));
     }
