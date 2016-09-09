@@ -368,4 +368,30 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($fs->delete($destination));
         $this->assertTrue($fs->delete($copyDestination));
     }
+
+    public function testCanRenameObject()
+    {
+        $testId = uniqid('', true);
+        $originalDestination = "/test_content{$testId}/test.txt";
+        $renameDestination = "/test_content{$testId}/test-rename.txt";
+        $initialContent = 'Foo';
+
+        $adapterConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+
+        $fs = new Filesystem($adapter);
+
+        $fs->put($originalDestination, $initialContent);
+        $this->assertEquals($initialContent, $fs->read($originalDestination));
+        $this->assertFalse($fs->has($renameDestination));
+        $this->assertTrue($fs->rename($originalDestination, $renameDestination));
+        $this->assertFalse($fs->has($originalDestination));
+        $this->assertTrue($fs->has($renameDestination));
+
+        $this->assertTrue($fs->delete($renameDestination));
+    }
 }
