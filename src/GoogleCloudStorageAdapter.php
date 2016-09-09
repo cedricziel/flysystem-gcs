@@ -5,7 +5,7 @@ namespace CedricZiel\FlysystemGcs;
 use Google\Cloud\Exception\NotFoundException;
 use Google\Cloud\Storage\Acl;
 use Google\Cloud\Storage\Bucket;
-use Google\Cloud\Storage\Object as StorageObject;
+use Google\Cloud\Storage\StorageObject;
 use Google\Cloud\Storage\StorageClient;
 use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\AdapterInterface;
@@ -172,12 +172,11 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
     public function copy($path, $newpath)
     {
         $path = $this->applyPathPrefix($path);
-        $newpath = $this->applyPathPrefix($path);
+        $newpath = $this->applyPathPrefix($newpath);
 
-        $tmpFile = tmpfile();
-        // TODO: is streaming the better option?
-        $this->bucket->object($path)->downloadToFile($tmpFile);
-        $this->bucket->upload($tmpFile, ['name' => $newpath]);
+        $this->bucket
+            ->object($path)
+            ->copy($this->bucket, ['name' => $newpath]);
 
         return $this->bucket->object($newpath)->exists();
     }

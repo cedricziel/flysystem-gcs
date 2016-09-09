@@ -313,6 +313,9 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($contents, $data);
         $this->assertTrue($fs->has($destinationPathPublic));
         $this->assertEquals(AdapterInterface::VISIBILITY_PUBLIC, $fs->getVisibility($destinationPathPublic));
+
+        $this->assertTrue($fs->delete($destinationPathPrivate));
+        $this->assertTrue($fs->delete($destinationPathPublic));
     }
 
     /**
@@ -339,5 +342,30 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($fs->update($destination, $updatedContent));
         $this->assertEquals($updatedContent, $fs->read($destination));
         $this->assertTrue($fs->delete($destination));
+    }
+
+    public function testCanCopyObject()
+    {
+        $testId = uniqid('', true);
+        $destination = "/test_content{$testId}/test.txt";
+        $copyDestination = "/test_content{$testId}/test-copy.txt";
+        $initialContent = 'Foo';
+
+        $adapterConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+
+        $fs = new Filesystem($adapter);
+
+        $fs->put($destination, $initialContent);
+        $this->assertEquals($initialContent, $fs->read($destination));
+        $this->assertFalse($fs->has($copyDestination));
+        $this->assertTrue($fs->copy($destination, $copyDestination));
+
+        $this->assertTrue($fs->delete($destination));
+        $this->assertTrue($fs->delete($copyDestination));
     }
 }
