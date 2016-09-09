@@ -5,7 +5,7 @@ namespace CedricZiel\FlysystemGcs;
 use Google\Cloud\Exception\NotFoundException;
 use Google\Cloud\Storage\Acl;
 use Google\Cloud\Storage\Bucket;
-use Google\Cloud\Storage\Object as StorageObject;
+use Google\Cloud\Storage\StorageObject;
 use Google\Cloud\Storage\StorageClient;
 use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\AdapterInterface;
