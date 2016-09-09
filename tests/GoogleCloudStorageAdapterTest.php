@@ -117,7 +117,7 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
     public function canCreateDirectories()
     {
         $testId = uniqid('', true);
-        $destinationPath = "/test_content{$testId}";
+        $destinationPath = "/test_content-canCreateDirectories-{$testId}";
 
         $minimalConfig = [
             'bucket'    => $this->bucket,
@@ -137,8 +137,8 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
     public function testAFileCanBeRead()
     {
         $testId = uniqid('', true);
-        $destinationPath = "/test_{$testId}_text.txt";
-        $content = 'TestContent';
+        $destinationPath = "/test_testAFileCanBeRead-{$testId}_text.txt";
+        $content = 'testAFileCanBeRead';
 
         $minimalConfig = [
             'bucket'    => $this->bucket,
@@ -167,7 +167,7 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
             'The mime type is available'
         );
         $this->assertEquals(
-            11,
+            strlen($content),
             $adapter->getSize($destinationPath)['size'],
             'The size from the metadata matches the input'
         );
@@ -206,7 +206,7 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
     public function testPrefixesCanBeUsed()
     {
         $testId = uniqid();
-        $testPrefix = "my/prefix/{$testId}/";
+        $testPrefix = "my/prefix/testPrefixesCanBeUsed-{$testId}/";
 
         $simpleConfig = new Config([]);
         $prefixedAdapterConfig = [
@@ -242,7 +242,7 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
     public function testCanBeWrappedWithAFilesystem()
     {
         $testId = uniqid('', true);
-        $destinationPath = "/test_content{$testId}/test.txt";
+        $destinationPath = "/test_content-testCanBeWrappedWithAFilesystem-{$testId}/test.txt";
 
         $adapterConfig = [
             'bucket'    => $this->bucket,
@@ -271,8 +271,8 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
     public function testVisibilityCanBeSetOnWrite()
     {
         $testId = uniqid('', true);
-        $destinationPathPrivate = "/test_content{$testId}/test-private.txt";
-        $destinationPathPublic = "/test_content{$testId}/test-public.txt";
+        $destinationPathPrivate = "/test_content-testVisibilityCanBeSetOnWrite-{$testId}/test-private.txt";
+        $destinationPathPublic = "/test_content-testVisibilityCanBeSetOnWrite-{$testId}/test-public.txt";
 
         $adapterConfig = [
             'bucket'    => $this->bucket,
@@ -324,9 +324,9 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
     public function testCanUpdateAFile()
     {
         $testId = uniqid('', true);
-        $destination = "/test_content{$testId}/test.txt";
-        $initialContent = 'Foo';
-        $updatedContent = 'Bar';
+        $destination = "/test_content-testCanUpdateAFile-{$testId}/test.txt";
+        $initialContent = 'testCanUpdateAFile';
+        $updatedContent = 'testCanUpdateAFile-update';
 
         $adapterConfig = [
             'bucket'    => $this->bucket,
@@ -347,9 +347,9 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
     public function testCanCopyObject()
     {
         $testId = uniqid('', true);
-        $destination = "/test_content{$testId}/test.txt";
-        $copyDestination = "/test_content{$testId}/test-copy.txt";
-        $initialContent = 'Foo';
+        $destination = "/test_content-testCanCopyObject-{$testId}/test.txt";
+        $copyDestination = "/test_content-testCanCopyObject-{$testId}/test-copy.txt";
+        $initialContent = 'testCanCopyObject';
 
         $adapterConfig = [
             'bucket'    => $this->bucket,
@@ -372,9 +372,9 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
     public function testCanRenameObject()
     {
         $testId = uniqid('', true);
-        $originalDestination = "/test_content{$testId}/test.txt";
-        $renameDestination = "/test_content{$testId}/test-rename.txt";
-        $initialContent = 'Foo';
+        $originalDestination = "/test_content-testCanRenameObject-{$testId}/test.txt";
+        $renameDestination = "/test_content-testCanRenameObject-{$testId}/test-rename.txt";
+        $initialContent = 'testCanRenameObject';
 
         $adapterConfig = [
             'bucket'    => $this->bucket,
