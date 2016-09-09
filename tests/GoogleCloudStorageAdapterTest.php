@@ -313,6 +313,9 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($contents, $data);
         $this->assertTrue($fs->has($destinationPathPublic));
         $this->assertEquals(AdapterInterface::VISIBILITY_PUBLIC, $fs->getVisibility($destinationPathPublic));
+
+        $this->assertTrue($fs->delete($destinationPathPrivate));
+        $this->assertTrue($fs->delete($destinationPathPublic));
     }
 
     /**
