@@ -172,12 +172,11 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
     public function copy($path, $newpath)
     {
         $path = $this->applyPathPrefix($path);
-        $newpath = $this->applyPathPrefix($path);
+        $newpath = $this->applyPathPrefix($newpath);
 
-        $tmpFile = tmpfile();
-        // TODO: is streaming the better option?
-        $this->bucket->object($path)->downloadToFile($tmpFile);
-        $this->bucket->upload($tmpFile, ['name' => $newpath]);
+        $this->bucket
+            ->object($path)
+            ->copy($this->bucket, ['name' => $newpath]);
 
         return $this->bucket->object($newpath)->exists();
     }
