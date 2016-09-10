@@ -35,10 +35,6 @@ the environment.
 | GCLOUD_BUCKET | name of the bucket to perform the tests on |
 | GCLOUD_PROJECT | the cloud project to use |
 
-## ToDo
-
-* get copy and rename operations right
-
 ## License
 
 MIT
