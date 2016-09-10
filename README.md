@@ -4,6 +4,14 @@
 
 Flysystem Adapter for Google cloud storage using the gcloud PHP library
 
+## Installation
+
+Using composer:
+
+```
+composer require cedricziel/flysystem-gcs
+```
+
 ## How-To
 
 ```php
@@ -20,11 +28,31 @@ $adapter = new GoogleCloudStorageAdapter(null, $adapterOptions);
 $filesystem = new Filesystem($adapter);
 ```
 
+## Authentication
+
+This library utilizes the PHP library [`google/cloud`](https://github.com/GoogleCloudPlatform/google-cloud-php), which in turn uses [google/auth](https://github.com/google/google-auth-library-php).
+
+Why is this important? It's important, because if you're authenticated
+locally, through the `gcloud` command-line utility, or running on a 
+Google Cloud Platform VM, in many cases you are already authenticated,
+and you don't need to do anything at all, in regards to authentication.
+
+For any other case, you will most probably want to export the environment 
+variable `GOOGLE_APPLICATION_CREDENTIALS` with a value of the absolute 
+path to your service account credentials that is authorized to use
+the `Storage: Full Access` oAuth2 scope, and you're all set.
+
+All examples, including tests, make use of this behaviour.
+
+If that's not what you want, you can create your own `StorageClient` object
+that's authenticated differently and pass it to the adapter class constructor
+as first argument.
+
 ## Demo
 
 There's [a demo project](https://github.com/cedricziel/flysystem-gcs-demo) that shows simple operations in a file system manager.
 
-### Public URLs to StorageObjects
+## Public URLs to StorageObjects
 
 The Adapter ships with 2 different methods to generate public URLs:
 
@@ -34,7 +62,7 @@ The Adapter ships with 2 different methods to generate public URLs:
 
 Read below to know when you will want to use the one or the other.
 
-#### Flysystem Plugin
+### Flysystem Plugin
 
 The standard way to generate public urls with this adapter would be to
 add a flysystem plugin to your `FilesystemInterface` instance.
@@ -130,7 +158,7 @@ $publicUrl = $filesystem->getUrl($path);
 // $publicUrl == 'http://assets.example.com/my/prefix/text-object.txt'
 ```
 
-#### `getUrl` on the adapter / Laravel 5
+### `getUrl` on the adapter / Laravel 5
 
 The Storage services used in Laravel 5 do not use flysystem plugins.
 
