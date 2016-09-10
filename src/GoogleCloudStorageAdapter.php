@@ -36,9 +36,19 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
     const GCS_VISIBILITY_PUBLIC_READ = 'publicRead';
 
     /**
+     * Public URL prefix
+     */
+    const GCS_BASE_URL = 'https://storage.googleapis.com';
+
+    /**
      * @var Bucket
      */
     protected $bucket;
+
+    /**
+     * @var string
+     */
+    protected $baseUrl;
 
     /**
      * @var StorageClient
@@ -80,6 +90,8 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         } else {
             $this->setPathPrefix('');
         }
+
+        $this->prepareBaseUrl($config);
     }
 
     /**
@@ -417,6 +429,18 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
     }
 
     /**
+     * @param string $path
+     *
+     * @return string
+     */
+    public function getUrl($path)
+    {
+        $path = $this->applyPathPrefix($path);
+
+        return implode('/', [$this->baseUrl, $path]);
+    }
+
+    /**
      * @param $object StorageObject
      *
      * @return array
@@ -500,5 +524,25 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         $uploadedObject->reload();
 
         return $this->convertObjectInfo($uploadedObject);
+    }
+
+    /**
+     * @param array $config
+     */
+    protected function prepareBaseUrl($config = [])
+    {
+        if (array_key_exists('url', $config)) {
+            $this->baseUrl = $config['url'];
+
+            return;
+        }
+
+        $pieces = [
+            static::GCS_BASE_URL,
+            $this->bucket->name(),
+            $this->pathPrefix,
+        ];
+        $pieces = array_filter($pieces);
+        $this->baseUrl = implode('/', $pieces);
     }
 }
