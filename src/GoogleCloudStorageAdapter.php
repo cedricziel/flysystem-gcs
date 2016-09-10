@@ -8,6 +8,7 @@ use Google\Cloud\Storage\Bucket;
 use Google\Cloud\Storage\StorageObject;
 use Google\Cloud\Storage\StorageClient;
 use League\Flysystem\Adapter\AbstractAdapter;
+use League\Flysystem\Adapter\Polyfill\StreamedReadingTrait;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\Config;
 
@@ -22,6 +23,8 @@ use League\Flysystem\Config;
  */
 class GoogleCloudStorageAdapter extends AbstractAdapter
 {
+    use StreamedReadingTrait;
+
     /**
      * ACL that grants access to everyone on the project
      */
@@ -90,17 +93,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function write($path, $contents, Config $config)
     {
-        $path = $this->applyPathPrefix($path);
-        $metadata = [
-            'name' => $path,
-        ];
-
-        $metadata += $this->getOptionsFromConfig($config);
-
-        $uploadedObject = $this->bucket->upload($contents, $metadata);
-        $uploadedObject->reload();
-
-        return $this->convertObjectInfo($uploadedObject);
+        return $this->writeObject($path, $contents, $config);
     }
 
     /**
@@ -114,7 +107,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function writeStream($path, $resource, Config $config)
     {
-        return $this->write($path, $resource, $config);
+        return $this->writeObject($path, $resource, $config);
     }
 
     /**
@@ -128,7 +121,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function update($path, $contents, Config $config)
     {
-        return $this->write($path, $contents, $config);
+        return $this->writeObject($path, $contents, $config);
     }
 
     /**
@@ -142,7 +135,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      */
     public function updateStream($path, $resource, Config $config)
     {
-        return $this->update($path, $resource, $config);
+        return $this->writeObject($path, $resource, $config);
     }
 
     /**
@@ -303,18 +296,6 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         $contents = $object->downloadAsString();
 
         return compact('path', 'contents');
-    }
-
-    /**
-     * Read a file as a stream.
-     *
-     * @param string $path
-     *
-     * @return array|false
-     */
-    public function readStream($path)
-    {
-        // TODO: Implement readStream() method.
     }
 
     /**
@@ -495,5 +476,29 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         }
 
         return $options;
+    }
+
+    /**
+     * Writes an object to the current
+     *
+     * @param string          $path
+     * @param string|resource $contents
+     * @param Config          $config
+     *
+     * @return array
+     */
+    protected function writeObject($path, $contents, Config $config)
+    {
+        $path = $this->applyPathPrefix($path);
+        $metadata = [
+            'name' => $path,
+        ];
+
+        $metadata += $this->getOptionsFromConfig($config);
+
+        $uploadedObject = $this->bucket->upload($contents, $metadata);
+        $uploadedObject->reload();
+
+        return $this->convertObjectInfo($uploadedObject);
     }
 }

@@ -394,4 +394,43 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
 
         $this->assertTrue($fs->delete($renameDestination));
     }
+
+    public function testObjectsCanBeHandledThroughStreams()
+    {
+        $testId = uniqid('', true);
+        $originalDestination = "/test_content-testObjectsCanBeHandledThroughStreams-{$testId}/test.txt";
+        $initialContent = 'testObjectsCanBeHandledThroughStreams';
+        $updatedContent = 'testObjectsCanBeHandledThroughStreamsUpdated';
+
+        $adapterConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+        $fs = new Filesystem($adapter);
+
+        // put through stream
+        $contentStream = fopen('data://text/plain;base64,' . base64_encode($initialContent),'r');
+        $fs->putStream($originalDestination, $contentStream);
+
+        // read through stream
+        $this->assertEquals($initialContent, stream_get_contents($fs->readStream($originalDestination)));
+
+        // update through stream
+        $updateContentStream = fopen('data://text/plain;base64,' . base64_encode($updatedContent),'r');
+        $this->assertTrue($fs->updateStream($originalDestination, $updateContentStream));
+
+        // read updated content through stream
+        $this->assertEquals($updatedContent, stream_get_contents($fs->readStream($originalDestination)));
+
+        $this->assertTrue($fs->delete($originalDestination));
+        $this->assertFalse($fs->has($originalDestination));
+
+        $contentStream = fopen('data://text/plain;base64,' . base64_encode($initialContent),'r');
+        $this->assertTrue($fs->writeStream($originalDestination, $contentStream));
+        $this->assertEquals($initialContent, stream_get_contents($fs->readStream($originalDestination)));
+        $this->assertTrue($fs->delete($originalDestination));
+        $this->assertFalse($fs->has($originalDestination));
+    }
 }
