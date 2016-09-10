@@ -3,6 +3,7 @@
 namespace CedricZiel\FlysystemGcs\Tests;
 
 use CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter;
+use CedricZiel\FlysystemGcs\Plugin\GoogleCloudStoragePublicUrlPlugin;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
@@ -432,5 +433,68 @@ class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($initialContent, stream_get_contents($fs->readStream($originalDestination)));
         $this->assertTrue($fs->delete($originalDestination));
         $this->assertFalse($fs->has($originalDestination));
+    }
+
+    /**
+     * @dataProvider urlPrefixDataProvider
+     *
+     * @param string $urlPrefix
+     * @param string $objectPath
+     * @param string $expectedUrl
+     */
+    public function testObjectsPublicUrlsCanUseCustomUrls($urlPrefix, $objectPath, $expectedUrl)
+    {
+        $adapterConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+        $fs = new Filesystem($adapter);
+        $fs->addPlugin(new GoogleCloudStoragePublicUrlPlugin(['url' => $urlPrefix]));
+
+        $this->assertEquals($expectedUrl, $fs->getUrl($objectPath));
+    }
+
+    public function urlPrefixDataProvider()
+    {
+        return [
+            ['foo://bar', 'bar/baz.txt', 'foo://bar/bar/baz.txt'],
+            ['foo://bar', '/bar/baz.txt', 'foo://bar/bar/baz.txt'],
+            ['foo://bar/', '/bar/baz.txt', 'foo://bar/bar/baz.txt'],
+            ['foo://bar/baz/', '/bar/baz.txt', 'foo://bar/baz/bar/baz.txt'],
+        ];
+    }
+
+    /**
+     * @dataProvider bucketPrefixDataProvider
+     *
+     * @param string $bucketName
+     * @param string $objectPath
+     * @param string $expectedUrl
+     */
+    public function testObjectsPublicUrlsCanBeRetrieved($bucketName, $objectPath, $expectedUrl)
+    {
+        $adapterConfig = [
+            'bucket'    => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+        $fs = new Filesystem($adapter);
+        $fs->addPlugin(new GoogleCloudStoragePublicUrlPlugin(['bucket' => $bucketName]));
+
+        $this->assertEquals($expectedUrl, $fs->getUrl($objectPath));
+    }
+
+    public function bucketPrefixDataProvider()
+    {
+        return [
+            ['my-bucket', 'bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/bar/baz.txt'],
+            ['my-bucket', '/bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/bar/baz.txt'],
+            ['my-bucket', '/bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/bar/baz.txt'],
+            ['my-bucket/prefix/in/bucket', '/bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/prefix/in/bucket/bar/baz.txt'],
+            ['my-bucket/prefix/in/bucket/', '/bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/prefix/in/bucket/bar/baz.txt'],
+        ];
     }
 }
