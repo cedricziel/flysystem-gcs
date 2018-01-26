@@ -470,7 +470,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         // size when file
         if ($type === 'file') {
             $normalizedObjectInfo['size'] = $objectInfo['size'];
-            $normalizedObjectInfo['mimetype'] = $objectInfo['contentType'];
+            $normalizedObjectInfo['mimetype'] = isset($objectInfo['contentType']) ? $objectInfo['contentType'] : null;
         }
 
         return $normalizedObjectInfo;
