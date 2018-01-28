@@ -7,8 +7,9 @@ use CedricZiel\FlysystemGcs\Plugin\GoogleCloudStoragePublicUrlPlugin;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
+use PHPUnit\Framework\TestCase;
 
-class GoogleCloudStorageAdapterTest extends \PHPUnit_Framework_TestCase
+class GoogleCloudStorageAdapterTest extends TestCase
 {
     /**
      * @var string

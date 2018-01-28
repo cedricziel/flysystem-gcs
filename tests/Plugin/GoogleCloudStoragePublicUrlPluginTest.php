@@ -4,8 +4,9 @@ namespace CedricZiel\FlysystemGcs\Tests\Plugin;
 
 use CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter;
 use CedricZiel\FlysystemGcs\Plugin\GoogleCloudStoragePublicUrlPlugin;
+use PHPUnit\Framework\TestCase;
 
-class GoogleCloudStoragePublicUrlPluginTest extends \PHPUnit_Framework_TestCase
+class GoogleCloudStoragePublicUrlPluginTest extends TestCase
 {
     /**
      * @expectedException \InvalidArgumentException
