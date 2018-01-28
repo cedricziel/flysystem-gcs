@@ -11,6 +11,7 @@
     ],
     "type": "library",
     "require": {
+        "php": ">=7.0.0",
         "google/cloud": "~0.52",
         "league/flysystem": "^1.0"
     },
