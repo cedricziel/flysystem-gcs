@@ -27,9 +27,6 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $this->bucket = getenv('GCLOUD_BUCKET');
     }
 
-    /**
-     * @test
-     */
     public function testAnAdapterCanBeCreatedWithMinimalConfiguration()
     {
         $minimalConfig = [
@@ -38,6 +35,8 @@ class GoogleCloudStorageAdapterTest extends TestCase
         ];
 
         $adapter = new GoogleCloudStorageAdapter(null, $minimalConfig);
+
+        $this->assertInstanceOf(GoogleCloudStorageAdapter::class, $adapter);
     }
 
     public function testCanListContentsOfADirectory()
