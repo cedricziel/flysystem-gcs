@@ -8,6 +8,7 @@ use Google\Cloud\Storage\Bucket;
 use Google\Cloud\Storage\StorageObject;
 use Google\Cloud\Storage\StorageClient;
 use League\Flysystem\Adapter\AbstractAdapter;
+use League\Flysystem\Adapter\CanOverwriteFiles;
 use League\Flysystem\Adapter\Polyfill\StreamedReadingTrait;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\Config;
@@ -21,7 +22,7 @@ use League\Flysystem\Config;
  *
  * @see AdapterInterface
  */
-class GoogleCloudStorageAdapter extends AbstractAdapter
+class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFiles
 {
     use StreamedReadingTrait;
 
