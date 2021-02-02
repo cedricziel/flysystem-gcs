@@ -513,4 +513,26 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         self::assertEquals(sprintf('%s/%s/%s', GoogleCloudStorageAdapter::GCS_BASE_URL, $adapterConfig['bucket'], $objectName), $url);
     }
+
+    /**
+     * @see https://github.com/cedricziel/flysystem-gcs/issues/11
+     *
+     * @covers \CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter::has()
+     */
+    public function testHasWorksCorrectlyForDirectories(): void
+    {
+        $testId = uniqid('', true);
+        $adapterConfig = [
+            'bucket' => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $directoryName = sprintf('%s', sprintf('icon-%s', $testId));
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+        $fs = new Filesystem($adapter);
+        $fs->createDir($directoryName);
+
+        self::assertTrue($fs->has($directoryName));
+    }
 }

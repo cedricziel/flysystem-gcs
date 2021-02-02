@@ -288,7 +288,13 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
         $path = $this->applyPathPrefix($path);
         $object = $this->bucket->object($path);
 
-        return $object->exists();
+        if ($object->exists()) {
+            return true;
+        }
+
+        // flysystem strips trailing slashes so we need to check
+        // for directory objects
+        return $this->bucket->object(sprintf('%s/', $path))->exists();
     }
 
     /**
