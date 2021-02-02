@@ -195,8 +195,8 @@ the environment.
 | variable | meaning |
 |----------|---------|
 | GOOGLE_APPLICATION_CREDENTIALS | absolute path to the service account credentials *.json file |
-| GCLOUD_BUCKET | name of the bucket to perform the tests on |
-| GCLOUD_PROJECT | the cloud project to use |
+| GOOGLE_CLOUD_BUCKET  | name of the GCS bucket to perform the tests on |
+| GOOGLE_CLOUD_PROJECT | the cloud project id to use |
 
 ## License
 
