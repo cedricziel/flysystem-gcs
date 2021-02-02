@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CedricZiel\FlysystemGcs;
 
 use Google\Cloud\Core\Exception\NotFoundException;
 use Google\Cloud\Storage\Acl;
 use Google\Cloud\Storage\Bucket;
-use Google\Cloud\Storage\StorageObject;
 use Google\Cloud\Storage\StorageClient;
+use Google\Cloud\Storage\StorageObject;
 use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\Adapter\Polyfill\StreamedReadingTrait;
 use League\Flysystem\AdapterInterface;
@@ -17,7 +19,7 @@ use League\Flysystem\Config;
  * Permissions:
  * Flysystem mostly uses 2 different types of visibility: public and private. This adapter maps those
  * to either grant project-private access or public access. The default is `projectPrivate`
- * For using a more appropriate ACL for a specific use-case, the
+ * For using a more appropriate ACL for a specific use-case, the.
  *
  * @see AdapterInterface
  */
@@ -26,19 +28,19 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
     use StreamedReadingTrait;
 
     /**
-     * ACL that grants access to everyone on the project
+     * ACL that grants access to everyone on the project.
      */
-    const GCS_VISIBILITY_PROJECT_PRIVATE = 'projectPrivate';
+    public const GCS_VISIBILITY_PROJECT_PRIVATE = 'projectPrivate';
 
     /**
-     * ACL that grants public read access to everyone
+     * ACL that grants public read access to everyone.
      */
-    const GCS_VISIBILITY_PUBLIC_READ = 'publicRead';
+    public const GCS_VISIBILITY_PUBLIC_READ = 'publicRead';
 
     /**
-     * Public URL prefix
+     * Public URL prefix.
      */
-    const GCS_BASE_URL = 'https://storage.googleapis.com';
+    public const GCS_BASE_URL = 'https://storage.googleapis.com';
 
     /**
      * @var Bucket
@@ -69,10 +71,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      * [
      *  'bucket' => 'my-bucket-name',
      * ]
-     * ```
-     *
-     * @param StorageClient|null $storageClient
-     * @param array              $config
+     * ```.
      */
     public function __construct(StorageClient $storageClient = null, array $config = [])
     {
@@ -85,7 +84,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         $this->bucket = $this->storageClient->bucket($config['bucket']);
 
         // The adapter can optionally use a prefix. If it's not set, the bucket root is used
-        if (array_key_exists('prefix', $config)) {
+        if (\array_key_exists('prefix', $config)) {
             $this->setPathPrefix($config['prefix']);
         } else {
             $this->setPathPrefix('');
@@ -99,7 +98,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      *
      * @param string $path
      * @param string $contents
-     * @param Config $config Config object
+     * @param Config $config   Config object
      *
      * @return array|false false on failure file meta data on success
      */
@@ -113,7 +112,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      *
      * @param string   $path
      * @param resource $resource
-     * @param Config   $config Config object
+     * @param Config   $config   Config object
      *
      * @return array|false false on failure file meta data on success
      */
@@ -127,7 +126,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      *
      * @param string $path
      * @param string $contents
-     * @param Config $config Config object
+     * @param Config $config   Config object
      *
      * @return array|false false on failure file meta data on success
      */
@@ -141,7 +140,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      *
      * @param string   $path
      * @param resource $resource
-     * @param Config   $config Config object
+     * @param Config   $config   Config object
      *
      * @return array|false false on failure file meta data on success
      */
@@ -233,7 +232,6 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
      * Create a directory.
      *
      * @param string $dirname directory name
-     * @param Config $config
      *
      * @return array|false
      */
@@ -261,10 +259,10 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         $object = $this->bucket->object($path);
 
         switch (true) {
-            case $visibility === AdapterInterface::VISIBILITY_PUBLIC:
+            case AdapterInterface::VISIBILITY_PUBLIC === $visibility:
                 $object->acl()->add('allUsers', Acl::ROLE_READER);
                 break;
-            case $visibility === AdapterInterface::VISIBILITY_PRIVATE:
+            case AdapterInterface::VISIBILITY_PRIVATE === $visibility:
                 $object->acl()->delete('allUsers');
                 break;
             default:
@@ -418,7 +416,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         try {
             $allUsersAcl = $this->bucket->object($path)->acl()->get(['entity' => 'allUsers']);
 
-            if ($allUsersAcl['role'] === Acl::ROLE_READER) {
+            if (Acl::ROLE_READER === $allUsersAcl['role']) {
                 return ['path' => $path, 'visibility' => AdapterInterface::VISIBILITY_PUBLIC];
             }
         } catch (NotFoundException $e) {
@@ -453,7 +451,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
 
         // determine whether it's a file or a directory
         $type = 'file';
-        $objectNameLength = strlen($objectName);
+        $objectNameLength = \strlen($objectName);
         if (strpos($objectName, '/', $objectNameLength - 1)) {
             $type = 'dir';
         }
@@ -468,16 +466,16 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
         $normalizedObjectInfo['timestamp'] = $datetime->getTimestamp();
 
         // size when file
-        if ($type === 'file') {
+        if ('file' === $type) {
             $normalizedObjectInfo['size'] = $objectInfo['size'];
-            $normalizedObjectInfo['mimetype'] = isset($objectInfo['contentType']) ? $objectInfo['contentType'] : null;
+            $normalizedObjectInfo['mimetype'] = $objectInfo['contentType'] ?? null;
         }
 
         return $normalizedObjectInfo;
     }
 
     /**
-     * Converts flysystem specific config to options for the underlying API client
+     * Converts flysystem specific config to options for the underlying API client.
      *
      * @param $config Config
      *
@@ -489,10 +487,10 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
 
         if ($config->has('visibility')) {
             switch (true) {
-                case $config->get('visibility') === AdapterInterface::VISIBILITY_PUBLIC:
+                case AdapterInterface::VISIBILITY_PUBLIC === $config->get('visibility'):
                     $options['predefinedAcl'] = static::GCS_VISIBILITY_PUBLIC_READ;
                     break;
-                case $config->get('visibility') === AdapterInterface::VISIBILITY_PRIVATE:
+                case AdapterInterface::VISIBILITY_PRIVATE === $config->get('visibility'):
                 default:
                     $options['predefinedAcl'] = static::GCS_VISIBILITY_PROJECT_PRIVATE;
                     break;
@@ -503,11 +501,10 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
     }
 
     /**
-     * Writes an object to the current
+     * Writes an object to the current.
      *
      * @param string          $path
      * @param string|resource $contents
-     * @param Config          $config
      *
      * @return array
      */
@@ -529,9 +526,9 @@ class GoogleCloudStorageAdapter extends AbstractAdapter
     /**
      * @param array $config
      */
-    protected function prepareBaseUrl($config = [])
+    protected function prepareBaseUrl($config = []): void
     {
-        if (array_key_exists('url', $config)) {
+        if (\array_key_exists('url', $config)) {
             $this->baseUrl = $config['url'];
 
             return;

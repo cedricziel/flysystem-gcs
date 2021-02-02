@@ -1,0 +1,19 @@
+<?php
+
+$finder = PhpCsFixer\Finder::create()
+    ->in(__DIR__)
+    ->exclude(['vendor', 'tools']);
+
+$config = new PhpCsFixer\Config();
+
+return $config->setRules([
+    '@Symfony' => true,
+    '@Symfony:risky' => true,
+    '@PHP70Migration' => true,
+    '@PHP70Migration:risky' => true,
+    '@PHP71Migration' => true,
+    '@PHP71Migration:risky' => true,
+    '@PHPUnit84Migration:risky' => true,
+    'strict_param' => true,
+    'full_opening_tag' => false,
+])->setFinder($finder);
