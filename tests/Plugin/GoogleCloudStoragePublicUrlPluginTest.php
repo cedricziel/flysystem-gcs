@@ -27,7 +27,7 @@ class GoogleCloudStoragePublicUrlPluginTest extends TestCase
     {
         $plugin = new GoogleCloudStoragePublicUrlPlugin(['url' => $urlPrefix]);
 
-        $this->assertEquals($expectedUrl, $plugin->handle($objectPath));
+        self::assertEquals($expectedUrl, $plugin->handle($objectPath));
     }
 
     public function urlPrefixDataProvider()
@@ -51,7 +51,7 @@ class GoogleCloudStoragePublicUrlPluginTest extends TestCase
     {
         $plugin = new GoogleCloudStoragePublicUrlPlugin(['bucket' => $bucketName]);
 
-        $this->assertEquals($expectedUrl, $plugin->handle($objectPath));
+        self::assertEquals($expectedUrl, $plugin->handle($objectPath));
     }
 
     public function bucketPrefixDataProvider()
