@@ -21,7 +21,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
      */
     protected $bucket;
 
-    public function setUp()
+    public function setUp(): void
     {
         $this->project = getenv('GOOGLE_CLOUD_PROJECT');
         $this->bucket = getenv('GOOGLE_CLOUD_BUCKET');
