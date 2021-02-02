@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CedricZiel\FlysystemGcs\Tests;
 
 use CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter;
@@ -21,16 +23,16 @@ class GoogleCloudStorageAdapterTest extends TestCase
      */
     protected $bucket;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         $this->project = getenv('GOOGLE_CLOUD_PROJECT');
         $this->bucket = getenv('GOOGLE_CLOUD_BUCKET');
     }
 
-    public function testAnAdapterCanBeCreatedWithMinimalConfiguration()
+    public function testAnAdapterCanBeCreatedWithMinimalConfiguration(): void
     {
         $minimalConfig = [
-            'bucket'    => 'test',
+            'bucket' => 'test',
             'projectId' => 'test',
         ];
 
@@ -39,11 +41,11 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertInstanceOf(GoogleCloudStorageAdapter::class, $adapter);
     }
 
-    public function testCanListContentsOfADirectory()
+    public function testCanListContentsOfADirectory(): void
     {
         $testDirectory = '/'.uniqid('test_', true).'/';
         $minimalConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -63,16 +65,13 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertFalse($adapter->has(rtrim(ltrim($testDirectory, '/'), '/')));
     }
 
-    /**
-     * @test
-     */
-    public function testFilesCanBeUploaded()
+    public function testFilesCanBeUploaded(): void
     {
         $testId = uniqid('', true);
         $destinationPath = "/test_content/{$testId}_public_test.jpg";
 
         $minimalConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -112,16 +111,13 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertFalse($adapter->has($destinationPath));
     }
 
-    /**
-     * @test
-     */
-    public function canCreateDirectories()
+    public function testCanCreateDirectories(): void
     {
         $testId = uniqid('', true);
         $destinationPath = "/test_content-canCreateDirectories-{$testId}";
 
         $minimalConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -132,17 +128,14 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertTrue($adapter->deleteDir($destinationPath));
     }
 
-    /**
-     * @test
-     */
-    public function testAFileCanBeRead()
+    public function testAFileCanBeRead(): void
     {
         $testId = uniqid('', true);
         $destinationPath = "/test_testAFileCanBeRead-{$testId}_text.txt";
         $content = 'testAFileCanBeRead';
 
         $minimalConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -168,7 +161,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
             'The mime type is available'
         );
         self::assertEquals(
-            strlen($content),
+            \strlen($content),
             $adapter->getSize($destinationPath)['size'],
             'The size from the metadata matches the input'
         );
@@ -184,13 +177,10 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertFalse($adapter->has($destinationPath));
     }
 
-    /**
-     * @test
-     */
-    public function testDeletingNonExistentObjectsWillNotFail()
+    public function testDeletingNonExistentObjectsWillNotFail(): void
     {
         $minimalConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -199,25 +189,22 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertTrue($adapter->delete('no_file_in_storage.txt'));
     }
 
-    /**
-     * @test
-     */
-    public function testPrefixesCanBeUsed()
+    public function testPrefixesCanBeUsed(): void
     {
         $testId = uniqid();
         $testPrefix = "my/prefix/testPrefixesCanBeUsed-{$testId}/";
 
         $simpleConfig = new Config([]);
         $prefixedAdapterConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
-            'prefix'    => $testPrefix,
+            'prefix' => $testPrefix,
         ];
 
         $prefixedAdapter = new GoogleCloudStorageAdapter(null, $prefixedAdapterConfig);
 
         $unprefixedAdapterConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -235,16 +222,13 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertTrue($prefixedAdapter->delete($path));
     }
 
-    /**
-     * @test
-     */
-    public function testCanBeWrappedWithAFilesystem()
+    public function testCanBeWrappedWithAFilesystem(): void
     {
         $testId = uniqid('', true);
         $destinationPath = "/test_content-testCanBeWrappedWithAFilesystem-{$testId}/test.txt";
 
         $adapterConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -264,17 +248,14 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertFalse($fs->has($destinationPath), 'They are gone after the previous operation');
     }
 
-    /**
-     * @test
-     */
-    public function testVisibilityCanBeSetOnWrite()
+    public function testVisibilityCanBeSetOnWrite(): void
     {
         $testId = uniqid('', true);
         $destinationPathPrivate = "/test_content-testVisibilityCanBeSetOnWrite-{$testId}/test-private.txt";
         $destinationPathPublic = "/test_content-testVisibilityCanBeSetOnWrite-{$testId}/test-public.txt";
 
         $adapterConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -317,10 +298,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertTrue($fs->delete($destinationPathPublic));
     }
 
-    /**
-     * @test
-     */
-    public function testCanUpdateAFile()
+    public function testCanUpdateAFile(): void
     {
         $testId = uniqid('', true);
         $destination = "/test_content-testCanUpdateAFile-{$testId}/test.txt";
@@ -328,7 +306,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $updatedContent = 'testCanUpdateAFile-update';
 
         $adapterConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -343,7 +321,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertTrue($fs->delete($destination));
     }
 
-    public function testCanCopyObject()
+    public function testCanCopyObject(): void
     {
         $testId = uniqid('', true);
         $destination = "/test_content-testCanCopyObject-{$testId}/test.txt";
@@ -351,7 +329,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $initialContent = 'testCanCopyObject';
 
         $adapterConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -368,7 +346,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertTrue($fs->delete($copyDestination));
     }
 
-    public function testCanRenameObject()
+    public function testCanRenameObject(): void
     {
         $testId = uniqid('', true);
         $originalDestination = "/test_content-testCanRenameObject-{$testId}/test.txt";
@@ -376,7 +354,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $initialContent = 'testCanRenameObject';
 
         $adapterConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -394,7 +372,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertTrue($fs->delete($renameDestination));
     }
 
-    public function testObjectsCanBeHandledThroughStreams()
+    public function testObjectsCanBeHandledThroughStreams(): void
     {
         $testId = uniqid('', true);
         $originalDestination = "/test_content-testObjectsCanBeHandledThroughStreams-{$testId}/test.txt";
@@ -402,7 +380,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $updatedContent = 'testObjectsCanBeHandledThroughStreamsUpdated';
 
         $adapterConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -410,14 +388,14 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $fs = new Filesystem($adapter);
 
         // put through stream
-        $contentStream = fopen('data://text/plain;base64,' . base64_encode($initialContent),'r');
+        $contentStream = fopen('data://text/plain;base64,'.base64_encode($initialContent), 'r');
         $fs->putStream($originalDestination, $contentStream);
 
         // read through stream
         self::assertEquals($initialContent, stream_get_contents($fs->readStream($originalDestination)));
 
         // update through stream
-        $updateContentStream = fopen('data://text/plain;base64,' . base64_encode($updatedContent),'r');
+        $updateContentStream = fopen('data://text/plain;base64,'.base64_encode($updatedContent), 'r');
         self::assertTrue($fs->updateStream($originalDestination, $updateContentStream));
 
         // read updated content through stream
@@ -426,7 +404,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertTrue($fs->delete($originalDestination));
         self::assertFalse($fs->has($originalDestination));
 
-        $contentStream = fopen('data://text/plain;base64,' . base64_encode($initialContent),'r');
+        $contentStream = fopen('data://text/plain;base64,'.base64_encode($initialContent), 'r');
         self::assertTrue($fs->writeStream($originalDestination, $contentStream));
         self::assertEquals($initialContent, stream_get_contents($fs->readStream($originalDestination)));
         self::assertTrue($fs->delete($originalDestination));
@@ -440,10 +418,10 @@ class GoogleCloudStorageAdapterTest extends TestCase
      * @param string $objectPath
      * @param string $expectedUrl
      */
-    public function testObjectsPublicUrlsCanUseCustomUrls($urlPrefix, $objectPath, $expectedUrl)
+    public function testObjectsPublicUrlsCanUseCustomUrls($urlPrefix, $objectPath, $expectedUrl): void
     {
         $adapterConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 
@@ -471,10 +449,10 @@ class GoogleCloudStorageAdapterTest extends TestCase
      * @param string $objectPath
      * @param string $expectedUrl
      */
-    public function testObjectsPublicUrlsCanBeRetrieved($bucketName, $objectPath, $expectedUrl)
+    public function testObjectsPublicUrlsCanBeRetrieved($bucketName, $objectPath, $expectedUrl): void
     {
         $adapterConfig = [
-            'bucket'    => $this->bucket,
+            'bucket' => $this->bucket,
             'projectId' => $this->project,
         ];
 

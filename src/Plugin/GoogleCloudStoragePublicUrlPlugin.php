@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CedricZiel\FlysystemGcs\Plugin;
 
 use CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter;
@@ -18,8 +20,6 @@ use League\Flysystem\Plugin\AbstractPlugin;
  *
  * $publicUrl = $filesystem->getUrl($path);
  * ```
- *
- * @package CedricZiel\FlysystemGcs\Plugin
  */
 class GoogleCloudStoragePublicUrlPlugin extends AbstractPlugin
 {
@@ -29,15 +29,13 @@ class GoogleCloudStoragePublicUrlPlugin extends AbstractPlugin
     protected $urlPrefix;
 
     /**
-     * This url is prepended to an objects path
-     *
-     * @param array $config
+     * This url is prepended to an objects path.
      */
     public function __construct(array $config = [])
     {
-        if (array_key_exists('url', $config)) {
+        if (\array_key_exists('url', $config)) {
             $this->urlPrefix = $config['url'];
-        } elseif (array_key_exists('bucket', $config)) {
+        } elseif (\array_key_exists('bucket', $config)) {
             $this->urlPrefix = sprintf('%s/%s', GoogleCloudStorageAdapter::GCS_BASE_URL, $config['bucket']);
         } else {
             throw new \InvalidArgumentException(__CLASS__.': Neither a bucket, nor a url was given');

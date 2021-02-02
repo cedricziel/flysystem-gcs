@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace CedricZiel\FlysystemGcs\Tests\Plugin;
 
 use CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter;
@@ -8,11 +10,10 @@ use PHPUnit\Framework\TestCase;
 
 class GoogleCloudStoragePublicUrlPluginTest extends TestCase
 {
-    /**
-     * @expectedException \InvalidArgumentException
-     */
-    public function testThePluginNeedsBucketOrUrl()
+    public function testThePluginNeedsBucketOrUrl(): void
     {
+        $this->expectException(\InvalidArgumentException::class);
+
         $plugin = new GoogleCloudStoragePublicUrlPlugin();
     }
 
@@ -23,7 +24,7 @@ class GoogleCloudStoragePublicUrlPluginTest extends TestCase
      * @param string $objectPath
      * @param string $expectedUrl
      */
-    public function testPluginCanUseAUrlPrefix($urlPrefix, $objectPath, $expectedUrl)
+    public function testPluginCanUseAUrlPrefix($urlPrefix, $objectPath, $expectedUrl): void
     {
         $plugin = new GoogleCloudStoragePublicUrlPlugin(['url' => $urlPrefix]);
 
@@ -47,7 +48,7 @@ class GoogleCloudStoragePublicUrlPluginTest extends TestCase
      * @param string $objectPath
      * @param string $expectedUrl
      */
-    public function testCanUseBucketOption($bucketName, $objectPath, $expectedUrl)
+    public function testCanUseBucketOption($bucketName, $objectPath, $expectedUrl): void
     {
         $plugin = new GoogleCloudStoragePublicUrlPlugin(['bucket' => $bucketName]);
 
