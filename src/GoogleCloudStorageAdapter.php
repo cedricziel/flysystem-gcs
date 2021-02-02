@@ -434,9 +434,7 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
      */
     public function getUrl($path)
     {
-        $path = $this->applyPathPrefix($path);
-
-        return implode('/', [$this->baseUrl, $path]);
+        return sprintf('%s/%s', rtrim($this->baseUrl, '/'), ltrim($path, '/'));
     }
 
     /**

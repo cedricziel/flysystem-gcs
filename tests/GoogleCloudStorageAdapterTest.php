@@ -191,7 +191,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
     public function testPrefixesCanBeUsed(): void
     {
-        $testId = uniqid();
+        $testId = uniqid('', true);
         $testPrefix = "my/prefix/testPrefixesCanBeUsed-{$testId}/";
 
         $simpleConfig = new Config([]);
@@ -472,5 +472,45 @@ class GoogleCloudStorageAdapterTest extends TestCase
             ['my-bucket/prefix/in/bucket', '/bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/prefix/in/bucket/bar/baz.txt'],
             ['my-bucket/prefix/in/bucket/', '/bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/prefix/in/bucket/bar/baz.txt'],
         ];
+    }
+
+    /**
+     * @see https://github.com/cedricziel/flysystem-gcs/issues/12
+     *
+     * @covers \CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter::getUrl()
+     */
+    public function testPrefixIsNotAddedTwiceForUrl(): void
+    {
+        $testId = uniqid('', true);
+        $adapterConfig = [
+            'bucket' => $this->bucket,
+            'projectId' => $this->project,
+            'prefix' => sprintf('icon-%s', $testId),
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+        $url = $adapter->getUrl('test.txt');
+
+        self::assertEquals(sprintf('%s/%s/%s/test.txt', GoogleCloudStorageAdapter::GCS_BASE_URL, $adapterConfig['bucket'], $adapterConfig['prefix']), $url);
+    }
+
+    /**
+     * @see https://github.com/cedricziel/flysystem-gcs/issues/12
+     *
+     * @covers \CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter::getUrl()
+     */
+    public function testUrlCanBeCreated(): void
+    {
+        $testId = uniqid('', true);
+        $adapterConfig = [
+            'bucket' => $this->bucket,
+            'projectId' => $this->project,
+        ];
+
+        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
+        $objectName = sprintf('%s/test.txt', sprintf('icon-%s', $testId));
+        $url = $adapter->getUrl($objectName);
+
+        self::assertEquals(sprintf('%s/%s/%s', GoogleCloudStorageAdapter::GCS_BASE_URL, $adapterConfig['bucket'], $objectName), $url);
     }
 }
