@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace CedricZiel\FlysystemGcs\Tests;
 
 use CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter;
-use CedricZiel\FlysystemGcs\Plugin\GoogleCloudStoragePublicUrlPlugin;
-use League\Flysystem\AdapterInterface;
 use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
 use League\Flysystem\Visibility;
@@ -53,14 +51,15 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $config = new Config([]);
         $adapter = new GoogleCloudStorageAdapter(null, $minimalConfig);
 
-        $contents = $adapter->listContents('/');
+        $contents = $adapter->listContents('/', false);
 
-        self::assertNotFalse($adapter->createDirectory($testDirectory, $config));
+        $adapter->createDirectory($testDirectory, $config);
         self::assertTrue($adapter->fileExists($testDirectory));
 
-        $testContents = $adapter->listContents($testDirectory);
+        $testContents = $adapter->listContents($testDirectory, false);
 
-        self::assertTrue($adapter->deleteDirectory($testDirectory));
+        $adapter->deleteDirectory($testDirectory);
+
         self::assertFalse($adapter->fileExists($testDirectory));
         self::assertFalse($adapter->fileExists(ltrim($testDirectory, '/')));
         self::assertFalse($adapter->fileExists(rtrim(ltrim($testDirectory, '/'), '/')));
@@ -90,7 +89,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $adapter->setVisibility($destinationPath, Visibility::PUBLIC);
 
         // check visibility
-        self::assertTrue($adapter->delete($destinationPath));
+        $adapter->delete($destinationPath);
         self::assertFalse($adapter->fileExists($destinationPath));
 
         $testId = uniqid('', true);
@@ -108,25 +107,8 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $adapter->setVisibility($destinationPath, Visibility::PUBLIC);
         $adapter->setVisibility($destinationPath, Visibility::PRIVATE);
 
-        self::assertTrue($adapter->delete($destinationPath));
+        $adapter->delete($destinationPath);
         self::assertFalse($adapter->fileExists($destinationPath));
-    }
-
-    public function testCanCreateDirectories(): void
-    {
-        $testId = uniqid('', true);
-        $destinationPath = "/test_content-canCreateDirectories-{$testId}";
-
-        $minimalConfig = [
-            'bucket' => $this->bucket,
-            'projectId' => $this->project,
-        ];
-
-        $adapter = new GoogleCloudStorageAdapter(null, $minimalConfig);
-
-        $config = new Config([]);
-        self::assertNotFalse($adapter->createDirectory($destinationPath, $config));
-        self::assertTrue($adapter->deleteDirectory($destinationPath));
     }
 
     public function testAFileCanBeRead(): void
@@ -148,46 +130,29 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertTrue($adapter->fileExists($destinationPath), 'Once writte, the adapter can see the object in GCS');
         self::assertEquals(
             $content,
-            $adapter->read($destinationPath)['contents'],
+            $adapter->read($destinationPath),
             'The content of the GCS object matches exactly the input'
         );
         self::assertEquals(
-            'file',
-            $adapter->getMetadata($destinationPath)['type'],
-            'The object type is interpreted correctly'
-        );
-        self::assertEquals(
             'text/plain',
-            $adapter->getMimetype($destinationPath)['mimetype'],
+            $adapter->mimeType($destinationPath)->mimeType(),
             'The mime type is available'
         );
         self::assertEquals(
             \strlen($content),
-            $adapter->getSize($destinationPath)['size'],
+            $adapter->fileSize($destinationPath)->fileSize(),
             'The size from the metadata matches the input'
         );
 
-        self::assertIsInt($adapter->getTimestamp($destinationPath)['timestamp'], 'The object has a timestamp');
+        self::assertIsInt($adapter->lastModified($destinationPath)->lastModified(), 'The object has a timestamp');
 
         self::assertGreaterThan(
             0,
-            $adapter->getTimestamp($destinationPath)['timestamp'],
+            $adapter->lastModified($destinationPath)->lastModified(),
             'The timestamp from GCS is added to the metadata correctly'
         );
-        self::assertTrue($adapter->delete($destinationPath));
+        $adapter->delete($destinationPath);
         self::assertFalse($adapter->fileExists($destinationPath));
-    }
-
-    public function testDeletingNonExistentObjectsWillNotFail(): void
-    {
-        $minimalConfig = [
-            'bucket' => $this->bucket,
-            'projectId' => $this->project,
-        ];
-
-        $adapter = new GoogleCloudStorageAdapter(null, $minimalConfig);
-
-        self::assertTrue($adapter->delete('no_file_in_storage.txt'));
     }
 
     public function testPrefixesCanBeUsed(): void
@@ -215,12 +180,12 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $contents = 'This is just a simple melody....';
         $prefixedAdapter->write($path, $contents, $simpleConfig);
         self::assertTrue($prefixedAdapter->fileExists($path));
-        self::assertEquals($contents, $prefixedAdapter->read($path)['contents']);
+        self::assertEquals($contents, $prefixedAdapter->read($path));
 
         self::assertTrue($prefixedAdapter->fileExists($path));
         self::assertTrue($unprefixedAdapter->fileExists($testPrefix.$path));
 
-        self::assertTrue($prefixedAdapter->delete($path));
+        $prefixedAdapter->delete($path);
     }
 
     public function testCanBeWrappedWithAFilesystem(): void
@@ -245,7 +210,8 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertEquals($contents, $data);
         self::assertTrue($fs->fileExists($destinationPath));
 
-        self::assertTrue($fs->delete($destinationPath), 'Files can be removed without errors');
+        $fs->delete($destinationPath);
+
         self::assertFalse($fs->fileExists($destinationPath), 'They are gone after the previous operation');
     }
 
@@ -278,7 +244,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         self::assertEquals($contents, $data);
         self::assertTrue($fs->fileExists($destinationPathPrivate));
-        self::assertEquals(Visibility::PRIVATE, $fs->getVisibility($destinationPathPrivate));
+        self::assertEquals(Visibility::PRIVATE, $fs->visibility($destinationPathPrivate));
 
         // Test pre-setting public visibility
         $fs->write(
@@ -293,10 +259,10 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         self::assertEquals($contents, $data);
         self::assertTrue($fs->fileExists($destinationPathPublic));
-        self::assertEquals(Visibility::PUBLIC, $fs->getVisibility($destinationPathPublic));
+        self::assertEquals(Visibility::PUBLIC, $fs->visibility($destinationPathPublic));
 
-        self::assertTrue($fs->delete($destinationPathPrivate));
-        self::assertTrue($fs->delete($destinationPathPublic));
+        $fs->delete($destinationPathPrivate);
+        $fs->delete($destinationPathPublic);
     }
 
     public function testCanUpdateAFile(): void
@@ -317,9 +283,11 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         $fs->write($destination, $initialContent);
         self::assertTrue($fs->fileExists($destination));
-        self::assertTrue($fs->update($destination, $updatedContent));
+
+        $fs->write($destination, $updatedContent);
+
         self::assertEquals($updatedContent, $fs->read($destination));
-        self::assertTrue($fs->delete($destination));
+        $fs->delete($destination);
     }
 
     public function testCanCopyObject(): void
@@ -341,10 +309,11 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $fs->write($destination, $initialContent);
         self::assertEquals($initialContent, $fs->read($destination));
         self::assertFalse($fs->fileExists($copyDestination));
-        self::assertTrue($fs->copy($destination, $copyDestination));
 
-        self::assertTrue($fs->delete($destination));
-        self::assertTrue($fs->delete($copyDestination));
+        $fs->copy($destination, $copyDestination);
+
+        $fs->delete($destination);
+        $fs->delete($copyDestination);
     }
 
     public function testCanRenameObject(): void
@@ -366,11 +335,13 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $fs->write($originalDestination, $initialContent);
         self::assertEquals($initialContent, $fs->read($originalDestination));
         self::assertFalse($fs->fileExists($renameDestination));
-        self::assertTrue($fs->rename($originalDestination, $renameDestination));
+
+        $fs->move($originalDestination, $renameDestination, []);
+
         self::assertFalse($fs->fileExists($originalDestination));
         self::assertTrue($fs->fileExists($renameDestination));
 
-        self::assertTrue($fs->delete($renameDestination));
+        $fs->delete($renameDestination);
     }
 
     public function testObjectsCanBeHandledThroughStreams(): void
@@ -397,82 +368,19 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         // update through stream
         $updateContentStream = fopen('data://text/plain;base64,'.base64_encode($updatedContent), 'r');
-        self::assertTrue($fs->updateStream($originalDestination, $updateContentStream));
+        $fs->writeStream($originalDestination, $updateContentStream);
 
         // read updated content through stream
         self::assertEquals($updatedContent, stream_get_contents($fs->readStream($originalDestination)));
 
-        self::assertTrue($fs->delete($originalDestination));
+        $fs->delete($originalDestination);
         self::assertFalse($fs->fileExists($originalDestination));
 
         $contentStream = fopen('data://text/plain;base64,'.base64_encode($initialContent), 'r');
-        self::assertTrue($fs->writeStream($originalDestination, $contentStream));
+        $fs->writeStream($originalDestination, $contentStream);
         self::assertEquals($initialContent, stream_get_contents($fs->readStream($originalDestination)));
-        self::assertTrue($fs->delete($originalDestination));
+        $fs->delete($originalDestination);
         self::assertFalse($fs->fileExists($originalDestination));
-    }
-
-    /**
-     * @dataProvider urlPrefixDataProvider
-     *
-     * @param string $urlPrefix
-     * @param string $objectPath
-     * @param string $expectedUrl
-     */
-    public function testObjectsPublicUrlsCanUseCustomUrls($urlPrefix, $objectPath, $expectedUrl): void
-    {
-        $adapterConfig = [
-            'bucket' => $this->bucket,
-            'projectId' => $this->project,
-        ];
-
-        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
-        $fs = new Filesystem($adapter);
-        $fs->addPlugin(new GoogleCloudStoragePublicUrlPlugin(['url' => $urlPrefix]));
-
-        self::assertEquals($expectedUrl, $fs->getUrl($objectPath));
-    }
-
-    public function urlPrefixDataProvider()
-    {
-        return [
-            ['foo://bar', 'bar/baz.txt', 'foo://bar/bar/baz.txt'],
-            ['foo://bar', '/bar/baz.txt', 'foo://bar/bar/baz.txt'],
-            ['foo://bar/', '/bar/baz.txt', 'foo://bar/bar/baz.txt'],
-            ['foo://bar/baz/', '/bar/baz.txt', 'foo://bar/baz/bar/baz.txt'],
-        ];
-    }
-
-    /**
-     * @dataProvider bucketPrefixDataProvider
-     *
-     * @param string $bucketName
-     * @param string $objectPath
-     * @param string $expectedUrl
-     */
-    public function testObjectsPublicUrlsCanBeRetrieved($bucketName, $objectPath, $expectedUrl): void
-    {
-        $adapterConfig = [
-            'bucket' => $this->bucket,
-            'projectId' => $this->project,
-        ];
-
-        $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
-        $fs = new Filesystem($adapter);
-        $fs->addPlugin(new GoogleCloudStoragePublicUrlPlugin(['bucket' => $bucketName]));
-
-        self::assertEquals($expectedUrl, $fs->getUrl($objectPath));
-    }
-
-    public function bucketPrefixDataProvider()
-    {
-        return [
-            ['my-bucket', 'bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/bar/baz.txt'],
-            ['my-bucket', '/bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/bar/baz.txt'],
-            ['my-bucket', '/bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/bar/baz.txt'],
-            ['my-bucket/prefix/in/bucket', '/bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/prefix/in/bucket/bar/baz.txt'],
-            ['my-bucket/prefix/in/bucket/', '/bar/baz.txt', GoogleCloudStorageAdapter::GCS_BASE_URL.'/my-bucket/prefix/in/bucket/bar/baz.txt'],
-        ];
     }
 
     /**

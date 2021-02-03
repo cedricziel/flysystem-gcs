@@ -197,17 +197,17 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
      */
     public function delete(string $path): void
     {
-        $path = $this->pathPrefixer->prefixPath($path);
-        $object = $this->bucket->object($path);
-
-        if (false === $object->exists()) {
-            UnableToDeleteFile::atLocation($path);
+        if (!$this->fileExists($path)) {
+            return;
         }
 
-        $object->delete();
+        $path = $this->pathPrefixer->prefixPath($path);
+        $storageObject = $this->bucket->object($path);
 
-        if ($object->exists()) {
-            UnableToDeleteFile::atLocation($path);
+        try {
+            $storageObject->delete();
+        } catch (NotFoundException $exception) {
+            throw UnableToDeleteFile::atLocation($path, 'Object doesnt exist', $exception);
         }
     }
 
@@ -221,18 +221,15 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
 
         $dirname = $this->pathPrefixer->prefixPath($dirname);
 
-        $this->bucket->objects(['prefix' => $dirname]);
+        $objectIterator = $this->bucket->objects(['prefix' => $dirname]);
 
-        $storageObject = $this->bucket->object($dirname);
-        if (!$storageObject->exists()) {
+        if ($objectIterator->current() === null) {
             throw UnableToDeleteDirectory::atLocation($dirname, 'Directory doesnt exist');
         }
 
-        $storageObject->delete();
-
-        $storageObject = $this->bucket->object($dirname);
-        if ($storageObject->exists()) {
-            throw UnableToDeleteDirectory::atLocation($path, 'Unable to delete');
+        /** @var StorageObject $storageObject */
+        foreach ($objectIterator as $storageObject) {
+            $storageObject->delete();
         }
     }
 
@@ -266,7 +263,11 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
                 $object->acl()->add('allUsers', Acl::ROLE_READER);
                 break;
             case Visibility::PRIVATE === $visibility:
-                $object->acl()->delete('allUsers');
+                try {
+                    $object->acl()->delete('allUsers');
+                } catch (NotFoundException $exception) {
+                    // entry might not exist
+                }
                 break;
             default:
                 // invalid value
@@ -299,11 +300,11 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
      */
     public function read(string $path): string
     {
-        $path = $this->pathPrefixer->prefixPath($path);
+        $prefixedPath = $this->pathPrefixer->prefixPath($path);
 
-        $object = $this->bucket->object($path);
+        $object = $this->bucket->object($prefixedPath);
         if (!$object->exists()) {
-            throw UnableToReadFile::fromLocation($path);
+            throw UnableToReadFile::fromLocation($prefixedPath);
         }
 
         return $object->downloadAsString();
@@ -316,48 +317,28 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
      */
     public function listContents(string $path, bool $deep): iterable
     {
-        $directory = $this->pathPrefixer->prefixPath($path);
+        $directory = $this->pathPrefixer->prefixDirectoryPath($path);
 
-        $objects = $this->bucket->objects(
-            [
-                'prefix' => $directory,
-            ]
-        );
+        $listOptions = [
+            'prefix' => $directory,
+        ];
+
+        if ($deep === false) {
+            $listOptions['delimiter'] = '/';
+        }
+
+        $objectIterator = $this->bucket->objects($listOptions);
 
         /** @var StorageObject $gcsObject */
-        foreach ($objects as $gcsObject) {
-            if (false === $deep) {
-                // dont list nested objects
-                $name = $gcsObject->name();
-                $strippedName = substr($name, strlen($directory) + 1);
-                if (strpos($strippedName, '/') !== strlen($strippedName) - 1) {
-                    continue;
-                }
-            }
-
+        foreach ($objectIterator as $gcsObject) {
             yield $this->convertObjectInfo($gcsObject);
         }
-    }
 
-    /**
-     * Get all the meta data of a file or directory.
-     *
-     * @param string $path
-     *
-     * @return StorageAttributes
-     */
-    public function getMetadata($path): StorageAttributes
-    {
-        $path = $this->pathPrefixer->prefixPath($path);
-
-        $object = $this->bucket->object($path);
-
-        if (!$object->exists()) {
-            // todo: throw
-            // throw UnableToRetrieveMetadata::create($path, null);
+        /** @var string $folder */
+        foreach ($objectIterator->prefixes() as $folder) {
+            $strippedDirectoryName = $this->pathPrefixer->stripDirectoryPrefix($folder);
+            yield new DirectoryAttributes($strippedDirectoryName);
         }
-
-        return $this->convertObjectInfo($object);
     }
 
     /**
@@ -367,7 +348,7 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
      *
      * @return StorageAttributes
      */
-    public function getFileMetadata($path): FileAttributes
+    protected function getFileMetadata($path): FileAttributes
     {
         $object = $this->bucket->object($path);
         if (!$object->exists()) {
@@ -402,7 +383,7 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
             throw UnableToRetrieveMetadata::fileSize($path);
         }
 
-        return $this->getFileMetadata($path);
+        return new FileAttributes($path, (int) $storageObject->info()['size']);
     }
 
     /**
