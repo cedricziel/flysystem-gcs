@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CedricZiel\FlysystemGcs;
 
 use DateTimeImmutable;
+use Google\Cloud\Core\Exception\NotFoundException;
 use Google\Cloud\Storage\Acl;
 use Google\Cloud\Storage\Bucket;
 use Google\Cloud\Storage\StorageClient;
@@ -443,19 +444,24 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
      */
     public function visibility(string $path): FileAttributes
     {
-        $path = $this->pathPrefixer->prefixPath($path);
+        $prefixedPath = $this->pathPrefixer->prefixPath($path);
 
-        $storageObject = $this->bucket->object($path);
+        $storageObject = $this->bucket->object($prefixedPath);
         if (!$storageObject->exists()) {
-            throw UnableToRetrieveMetadata::visibility($path);
+            throw UnableToRetrieveMetadata::visibility($prefixedPath);
         }
 
-        $allUsersAcl = $storageObject->acl()->get(['entity' => 'allUsers']);
-        if (Acl::ROLE_READER === $allUsersAcl['role']) {
-            return new FileAttributes($path, null, Visibility::PUBLIC);
+        try {
+            $allUsersAcl = $storageObject->acl()->get(['entity' => 'allUsers']);
+
+            if (Acl::ROLE_READER === $allUsersAcl['role']) {
+                return new FileAttributes($prefixedPath, null, Visibility::PUBLIC);
+            }
+        } catch (NotFoundException $e) {
+            // no acl entry, it's fine
         }
 
-        return new FileAttributes($path, null, Visibility::PRIVATE);
+        return new FileAttributes($prefixedPath, null, Visibility::PRIVATE);
     }
 
     /**
@@ -559,9 +565,6 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
         $metadata += $this->getOptionsFromConfig($config);
 
         $uploadedObject = $this->bucket->upload($contents, $metadata);
-        $uploadedObject->reload();
-
-        return $this->convertObjectInfo($uploadedObject);
     }
 
     /**
