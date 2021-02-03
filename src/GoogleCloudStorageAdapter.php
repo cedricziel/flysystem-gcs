@@ -360,6 +360,18 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function fileSize(string $path): FileAttributes
     {
+        $path = $this->applyPathPrefix($path);
+
+        $object = $this->bucket->object($path);
+        if (!$object->exists()) {
+            // todo: break?
+        }
+
+        $storageAttributes = $this->convertObjectInfo($object);
+        if ($storageAttributes->isDir()) {
+            throw UnableToRetrieveMetadata::fileSize($path);
+        }
+
         return $this->getFileMetadata($path);
     }
 
@@ -425,7 +437,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
         $type = StorageAttributes::TYPE_FILE;
         $objectNameLength = \strlen($objectName);
         if (strpos($objectName, '/', $objectNameLength - 1)) {
-            $type = StorageAttributes::TYPE_FILE;
+            $type = StorageAttributes::TYPE_DIRECTORY;
         }
 
         $normalizedObjectInfo = [
