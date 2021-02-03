@@ -180,11 +180,15 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
         $sourcePath = $this->pathPrefixer->prefixPath($source);
         $destinationPath = $this->pathPrefixer->prefixPath($destination);
 
-        $object = $this->bucket->object($sourcePath);
+        $sourceObject = $this->bucket->object($sourcePath);
 
-        $copiedObject = $object->copy($this->bucket, ['name' => $destinationPath]);
-        $copiedObject->reload();
-        $storageObject = $copiedObject->exists();
+        $sourceVisibility = $this->visibility($source)->visibility();
+        $destinationOptions = [
+            'name' => $destinationPath,
+        ];
+
+        $sourceObject->copy($this->bucket, $destinationOptions);
+        $this->setVisibility($destination, $sourceVisibility);
     }
 
     /**
