@@ -342,8 +342,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
         $object = $this->bucket->object($path);
 
         if (!$object->exists()) {
-            // todo: throw
-            // throw UnableToRetrieveMetadata::create($path, null);
+            throw UnableToRetrieveMetadata::create($path, FileAttributes::ATTRIBUTE_TYPE);
         }
 
         $objectInfo = $this->convertObjectInfo($object);
@@ -362,12 +361,12 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
     {
         $path = $this->applyPathPrefix($path);
 
-        $object = $this->bucket->object($path);
-        if (!$object->exists()) {
-            // todo: break?
+        $storageObject = $this->bucket->object($path);
+        if (!$storageObject->exists()) {
+            throw UnableToRetrieveMetadata::fileSize($path);
         }
 
-        $storageAttributes = $this->convertObjectInfo($object);
+        $storageAttributes = $this->convertObjectInfo($storageObject);
         if ($storageAttributes->isDir()) {
             throw UnableToRetrieveMetadata::fileSize($path);
         }
@@ -381,6 +380,13 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function mimeType(string $path): FileAttributes
     {
+        $path = $this->applyPathPrefix($path);
+
+        $storageObject = $this->bucket->object($path);
+        if (!$storageObject->exists()) {
+            throw UnableToRetrieveMetadata::mimeType($path);
+        }
+
         return $this->getFileMetadata($path);
     }
 
@@ -390,6 +396,13 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function lastModified(string $path): FileAttributes
     {
+        $path = $this->applyPathPrefix($path);
+
+        $storageObject = $this->bucket->object($path);
+        if (!$storageObject->exists()) {
+            throw UnableToRetrieveMetadata::lastModified($path);
+        }
+
         return $this->getFileMetadata($path);
     }
 
