@@ -13,9 +13,12 @@ class FlysystemConformanceTest extends FilesystemAdapterTestCase
         $project = getenv('GOOGLE_CLOUD_PROJECT');
         $bucket = getenv('GOOGLE_CLOUD_BUCKET');
 
+        $testId = uniqid('test', true);
+
         $adapterConfig = [
             'bucket' => $bucket,
             'projectId' => $project,
+            'prefix' => $testId,
         ];
 
         return new GoogleCloudStorageAdapter(null, $adapterConfig);
