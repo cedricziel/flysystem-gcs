@@ -159,12 +159,12 @@ class GoogleCloudStorageAdapter implements FilesystemAdapter
      */
     public function move(string $source, string $destination, Config $config): void
     {
-        $source = $this->pathPrefixer->prefixPath($source);
-        $destination = $this->pathPrefixer->prefixPath($destination);
+        $prefixedSource = $this->pathPrefixer->prefixPath($source);
+        $prefixedDestination = $this->pathPrefixer->prefixPath($destination);
 
-        $sourceStorageObject = $this->bucket->object($source);
+        $sourceStorageObject = $this->bucket->object($prefixedSource);
         if (!$sourceStorageObject->exists()) {
-            throw UnableToMoveFile::fromLocationTo($source, $destination);
+            throw UnableToMoveFile::fromLocationTo($prefixedSource, $prefixedDestination);
         }
 
         $this->copy($source, $destination, new Config([]));
