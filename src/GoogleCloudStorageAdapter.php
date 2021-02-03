@@ -401,15 +401,17 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
     {
         $path = $this->applyPathPrefix($path);
 
-        $allUsersAcl = $this->bucket->object($path)->acl()->get(['entity' => 'allUsers']);
-
-        if (Acl::ROLE_READER === $allUsersAcl['role']) {
-            return ['path' => $path, 'visibility' => AdapterInterface::VISIBILITY_PUBLIC];
+        $storageObject = $this->bucket->object($path);
+        if (!$storageObject->exists()) {
+            throw UnableToRetrieveMetadata::visibility($path);
         }
 
-        return ['path' => $path, 'visibility' => AdapterInterface::VISIBILITY_PRIVATE];
+        $allUsersAcl = $storageObject->acl()->get(['entity' => 'allUsers']);
+        if (Acl::ROLE_READER === $allUsersAcl['role']) {
+            return new FileAttributes($path, null, Visibility::PUBLIC);
+        }
 
-        return FileAttributes::fromArray();
+        return new FileAttributes($path, null, Visibility::PRIVATE);
     }
 
     /**
