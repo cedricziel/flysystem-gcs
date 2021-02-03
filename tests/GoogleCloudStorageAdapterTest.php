@@ -9,6 +9,7 @@ use CedricZiel\FlysystemGcs\Plugin\GoogleCloudStoragePublicUrlPlugin;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
+use League\Flysystem\Visibility;
 use PHPUnit\Framework\TestCase;
 
 class GoogleCloudStorageAdapterTest extends TestCase
@@ -54,15 +55,15 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         $contents = $adapter->listContents('/');
 
-        self::assertNotFalse($adapter->createDir($testDirectory, $config));
-        self::assertTrue($adapter->has($testDirectory));
+        self::assertNotFalse($adapter->createDirectory($testDirectory, $config));
+        self::assertTrue($adapter->fileExists($testDirectory));
 
         $testContents = $adapter->listContents($testDirectory);
 
-        self::assertTrue($adapter->deleteDir($testDirectory));
-        self::assertFalse($adapter->has($testDirectory));
-        self::assertFalse($adapter->has(ltrim($testDirectory, '/')));
-        self::assertFalse($adapter->has(rtrim(ltrim($testDirectory, '/'), '/')));
+        self::assertTrue($adapter->deleteDirectory($testDirectory));
+        self::assertFalse($adapter->fileExists($testDirectory));
+        self::assertFalse($adapter->fileExists(ltrim($testDirectory, '/')));
+        self::assertFalse($adapter->fileExists(rtrim(ltrim($testDirectory, '/'), '/')));
     }
 
     public function testFilesCanBeUploaded(): void
@@ -84,13 +85,13 @@ class GoogleCloudStorageAdapterTest extends TestCase
             $config
         );
 
-        self::assertTrue($adapter->has($destinationPath));
+        self::assertTrue($adapter->fileExists($destinationPath));
 
-        $adapter->setVisibility($destinationPath, AdapterInterface::VISIBILITY_PUBLIC);
+        $adapter->setVisibility($destinationPath, Visibility::PUBLIC);
 
         // check visibility
         self::assertTrue($adapter->delete($destinationPath));
-        self::assertFalse($adapter->has($destinationPath));
+        self::assertFalse($adapter->fileExists($destinationPath));
 
         $testId = uniqid('', true);
         $destinationPath = "/test_content/{$testId}_private_test.jpg";
@@ -102,13 +103,13 @@ class GoogleCloudStorageAdapterTest extends TestCase
             $config
         );
 
-        self::assertTrue($adapter->has($destinationPath));
+        self::assertTrue($adapter->fileExists($destinationPath));
 
-        $adapter->setVisibility($destinationPath, AdapterInterface::VISIBILITY_PUBLIC);
-        $adapter->setVisibility($destinationPath, AdapterInterface::VISIBILITY_PRIVATE);
+        $adapter->setVisibility($destinationPath, Visibility::PUBLIC);
+        $adapter->setVisibility($destinationPath, Visibility::PRIVATE);
 
         self::assertTrue($adapter->delete($destinationPath));
-        self::assertFalse($adapter->has($destinationPath));
+        self::assertFalse($adapter->fileExists($destinationPath));
     }
 
     public function testCanCreateDirectories(): void
@@ -124,8 +125,8 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $adapter = new GoogleCloudStorageAdapter(null, $minimalConfig);
 
         $config = new Config([]);
-        self::assertNotFalse($adapter->createDir($destinationPath, $config));
-        self::assertTrue($adapter->deleteDir($destinationPath));
+        self::assertNotFalse($adapter->createDirectory($destinationPath, $config));
+        self::assertTrue($adapter->deleteDirectory($destinationPath));
     }
 
     public function testAFileCanBeRead(): void
@@ -144,7 +145,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $config = new Config([]);
         $adapter->write($destinationPath, $content, $config);
 
-        self::assertTrue($adapter->has($destinationPath), 'Once writte, the adapter can see the object in GCS');
+        self::assertTrue($adapter->fileExists($destinationPath), 'Once writte, the adapter can see the object in GCS');
         self::assertEquals(
             $content,
             $adapter->read($destinationPath)['contents'],
@@ -174,7 +175,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
             'The timestamp from GCS is added to the metadata correctly'
         );
         self::assertTrue($adapter->delete($destinationPath));
-        self::assertFalse($adapter->has($destinationPath));
+        self::assertFalse($adapter->fileExists($destinationPath));
     }
 
     public function testDeletingNonExistentObjectsWillNotFail(): void
@@ -213,11 +214,11 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $path = 'test.txt';
         $contents = 'This is just a simple melody....';
         $prefixedAdapter->write($path, $contents, $simpleConfig);
-        self::assertTrue($prefixedAdapter->has($path));
+        self::assertTrue($prefixedAdapter->fileExists($path));
         self::assertEquals($contents, $prefixedAdapter->read($path)['contents']);
 
-        self::assertTrue($prefixedAdapter->has($path));
-        self::assertTrue($unprefixedAdapter->has($testPrefix.$path));
+        self::assertTrue($prefixedAdapter->fileExists($path));
+        self::assertTrue($unprefixedAdapter->fileExists($testPrefix.$path));
 
         self::assertTrue($prefixedAdapter->delete($path));
     }
@@ -242,10 +243,10 @@ class GoogleCloudStorageAdapterTest extends TestCase
         $data = $fs->read($destinationPath);
 
         self::assertEquals($contents, $data);
-        self::assertTrue($fs->has($destinationPath));
+        self::assertTrue($fs->fileExists($destinationPath));
 
         self::assertTrue($fs->delete($destinationPath), 'Files can be removed without errors');
-        self::assertFalse($fs->has($destinationPath), 'They are gone after the previous operation');
+        self::assertFalse($fs->fileExists($destinationPath), 'They are gone after the previous operation');
     }
 
     public function testVisibilityCanBeSetOnWrite(): void
@@ -269,30 +270,30 @@ class GoogleCloudStorageAdapterTest extends TestCase
             $destinationPathPrivate,
             $contents,
             [
-                'visibility' => AdapterInterface::VISIBILITY_PRIVATE,
+                'visibility' => Visibility::PRIVATE,
             ]
         );
 
         $data = $fs->read($destinationPathPrivate);
 
         self::assertEquals($contents, $data);
-        self::assertTrue($fs->has($destinationPathPrivate));
-        self::assertEquals(AdapterInterface::VISIBILITY_PRIVATE, $fs->getVisibility($destinationPathPrivate));
+        self::assertTrue($fs->fileExists($destinationPathPrivate));
+        self::assertEquals(Visibility::PRIVATE, $fs->getVisibility($destinationPathPrivate));
 
         // Test pre-setting public visibility
         $fs->write(
             $destinationPathPublic,
             $contents,
             [
-                'visibility' => AdapterInterface::VISIBILITY_PUBLIC,
+                'visibility' => Visibility::PUBLIC,
             ]
         );
 
         $data = $fs->read($destinationPathPublic);
 
         self::assertEquals($contents, $data);
-        self::assertTrue($fs->has($destinationPathPublic));
-        self::assertEquals(AdapterInterface::VISIBILITY_PUBLIC, $fs->getVisibility($destinationPathPublic));
+        self::assertTrue($fs->fileExists($destinationPathPublic));
+        self::assertEquals(Visibility::PUBLIC, $fs->getVisibility($destinationPathPublic));
 
         self::assertTrue($fs->delete($destinationPathPrivate));
         self::assertTrue($fs->delete($destinationPathPublic));
@@ -314,8 +315,8 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         $fs = new Filesystem($adapter);
 
-        $fs->put($destination, $initialContent);
-        self::assertTrue($fs->has($destination));
+        $fs->write($destination, $initialContent);
+        self::assertTrue($fs->fileExists($destination));
         self::assertTrue($fs->update($destination, $updatedContent));
         self::assertEquals($updatedContent, $fs->read($destination));
         self::assertTrue($fs->delete($destination));
@@ -337,9 +338,9 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         $fs = new Filesystem($adapter);
 
-        $fs->put($destination, $initialContent);
+        $fs->write($destination, $initialContent);
         self::assertEquals($initialContent, $fs->read($destination));
-        self::assertFalse($fs->has($copyDestination));
+        self::assertFalse($fs->fileExists($copyDestination));
         self::assertTrue($fs->copy($destination, $copyDestination));
 
         self::assertTrue($fs->delete($destination));
@@ -362,12 +363,12 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         $fs = new Filesystem($adapter);
 
-        $fs->put($originalDestination, $initialContent);
+        $fs->write($originalDestination, $initialContent);
         self::assertEquals($initialContent, $fs->read($originalDestination));
-        self::assertFalse($fs->has($renameDestination));
+        self::assertFalse($fs->fileExists($renameDestination));
         self::assertTrue($fs->rename($originalDestination, $renameDestination));
-        self::assertFalse($fs->has($originalDestination));
-        self::assertTrue($fs->has($renameDestination));
+        self::assertFalse($fs->fileExists($originalDestination));
+        self::assertTrue($fs->fileExists($renameDestination));
 
         self::assertTrue($fs->delete($renameDestination));
     }
@@ -389,7 +390,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         // put through stream
         $contentStream = fopen('data://text/plain;base64,'.base64_encode($initialContent), 'r');
-        $fs->putStream($originalDestination, $contentStream);
+        $fs->writeStream($originalDestination, $contentStream);
 
         // read through stream
         self::assertEquals($initialContent, stream_get_contents($fs->readStream($originalDestination)));
@@ -402,13 +403,13 @@ class GoogleCloudStorageAdapterTest extends TestCase
         self::assertEquals($updatedContent, stream_get_contents($fs->readStream($originalDestination)));
 
         self::assertTrue($fs->delete($originalDestination));
-        self::assertFalse($fs->has($originalDestination));
+        self::assertFalse($fs->fileExists($originalDestination));
 
         $contentStream = fopen('data://text/plain;base64,'.base64_encode($initialContent), 'r');
         self::assertTrue($fs->writeStream($originalDestination, $contentStream));
         self::assertEquals($initialContent, stream_get_contents($fs->readStream($originalDestination)));
         self::assertTrue($fs->delete($originalDestination));
-        self::assertFalse($fs->has($originalDestination));
+        self::assertFalse($fs->fileExists($originalDestination));
     }
 
     /**
@@ -517,7 +518,7 @@ class GoogleCloudStorageAdapterTest extends TestCase
     /**
      * @see https://github.com/cedricziel/flysystem-gcs/issues/11
      *
-     * @covers \CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter::has()
+     * @covers \CedricZiel\FlysystemGcs\GoogleCloudStorageAdapter::fileExists()
      */
     public function testHasWorksCorrectlyForDirectories(): void
     {
@@ -531,8 +532,8 @@ class GoogleCloudStorageAdapterTest extends TestCase
 
         $adapter = new GoogleCloudStorageAdapter(null, $adapterConfig);
         $fs = new Filesystem($adapter);
-        $fs->createDir($directoryName);
+        $fs->createDirectory($directoryName);
 
-        self::assertTrue($fs->has($directoryName));
+        self::assertTrue($fs->fileExists($directoryName));
     }
 }

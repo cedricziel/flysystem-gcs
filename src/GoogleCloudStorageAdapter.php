@@ -4,16 +4,28 @@ declare(strict_types=1);
 
 namespace CedricZiel\FlysystemGcs;
 
+use DateTimeImmutable;
 use Google\Cloud\Core\Exception\NotFoundException;
 use Google\Cloud\Storage\Acl;
 use Google\Cloud\Storage\Bucket;
 use Google\Cloud\Storage\StorageClient;
 use Google\Cloud\Storage\StorageObject;
-use League\Flysystem\Adapter\AbstractAdapter;
-use League\Flysystem\Adapter\CanOverwriteFiles;
-use League\Flysystem\Adapter\Polyfill\StreamedReadingTrait;
-use League\Flysystem\AdapterInterface;
 use League\Flysystem\Config;
+use League\Flysystem\DirectoryAttributes;
+use League\Flysystem\FileAttributes;
+use League\Flysystem\FilesystemAdapter;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\InvalidVisibilityProvided;
+use League\Flysystem\StorageAttributes;
+use League\Flysystem\UnableToCopyFile;
+use League\Flysystem\UnableToCreateDirectory;
+use League\Flysystem\UnableToDeleteDirectory;
+use League\Flysystem\UnableToDeleteFile;
+use League\Flysystem\UnableToMoveFile;
+use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToRetrieveMetadata;
+use League\Flysystem\UnableToWriteFile;
+use League\Flysystem\Visibility;
 
 /**
  * Flysystem Adapter for Google Cloud Storage.
@@ -22,12 +34,13 @@ use League\Flysystem\Config;
  * to either grant project-private access or public access. The default is `projectPrivate`
  * For using a more appropriate ACL for a specific use-case, the.
  *
- * @see AdapterInterface
+ * @see FilesystemAdapter
+ *
+ * @todo Use PathPrefixer
+ * @todo implement visibility
  */
-class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteFiles
+class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements FilesystemAdapter
 {
-    use StreamedReadingTrait;
-
     /**
      * ACL that grants access to everyone on the project.
      */
@@ -99,171 +112,125 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
      *
      * @param string $path
      * @param string $contents
-     * @param Config $config   Config object
+     * @param Config $config Config object
      *
-     * @return array|false false on failure file meta data on success
+     * @return void false on failure file meta data on success
      */
-    public function write($path, $contents, Config $config)
+    public function write(string $path, string $contents, Config $config): void
     {
-        return $this->writeObject($path, $contents, $config);
+        $this->writeObject($path, $contents, $config);
     }
 
     /**
-     * Write a new file using a stream.
+     * @param resource $contents
      *
-     * @param string   $path
-     * @param resource $resource
-     * @param Config   $config   Config object
-     *
-     * @return array|false false on failure file meta data on success
+     * @throws UnableToWriteFile
+     * @throws FilesystemException
      */
-    public function writeStream($path, $resource, Config $config)
+    public function writeStream(string $path, $contents, Config $config): void
     {
-        return $this->writeObject($path, $resource, $config);
+       $this->writeObject($path, $contents, $config);
     }
 
     /**
-     * Update a file.
-     *
-     * @param string $path
-     * @param string $contents
-     * @param Config $config   Config object
-     *
-     * @return array|false false on failure file meta data on success
+     * @throws UnableToMoveFile
+     * @throws FilesystemException
      */
-    public function update($path, $contents, Config $config)
+    public function move(string $source, string $destination, Config $config): void
     {
-        return $this->writeObject($path, $contents, $config);
+        $statusCopy = $this->copy($source, $destination);
+        $statusRemoveOld = $this->delete($source);
+
+        if (!$statusCopy) {
+            throw UnableToMoveFile::fromLocationTo($source, $destination);
+        }
+
+        if (!$statusRemoveOld) {
+            throw UnableToMoveFile::fromLocationTo($source, $destination);
+        }
     }
 
     /**
-     * Update a file using a stream.
-     *
-     * @param string   $path
-     * @param resource $resource
-     * @param Config   $config   Config object
-     *
-     * @return array|false false on failure file meta data on success
+     * @throws UnableToCopyFile
+     * @throws FilesystemException
      */
-    public function updateStream($path, $resource, Config $config)
+    public function copy(string $source, string $destination, Config $config): void
     {
-        return $this->writeObject($path, $resource, $config);
-    }
-
-    /**
-     * Rename a file.
-     *
-     * @param string $path
-     * @param string $newpath
-     *
-     * @return bool
-     */
-    public function rename($path, $newpath)
-    {
-        $statusCopy = $this->copy($path, $newpath);
-        $statusRemoveOld = $this->delete($path);
-
-        return $statusCopy && $statusRemoveOld;
-    }
-
-    /**
-     * Copy a file.
-     *
-     * @param string $path
-     * @param string $newpath
-     *
-     * @return bool
-     */
-    public function copy($path, $newpath)
-    {
-        $path = $this->applyPathPrefix($path);
-        $newpath = $this->applyPathPrefix($newpath);
+        $path = $this->applyPathPrefix($source);
+        $newpath = $this->applyPathPrefix($destination);
 
         $this->bucket
             ->object($path)
             ->copy($this->bucket, ['name' => $newpath]);
-
-        return $this->bucket->object($newpath)->exists();
     }
 
     /**
-     * Delete a file.
-     *
-     * @param string $path
-     *
-     * @return bool
+     * @throws UnableToDeleteFile
+     * @throws FilesystemException
      */
-    public function delete($path)
+    public function delete(string $path): void
     {
         $path = $this->applyPathPrefix($path);
         $object = $this->bucket->object($path);
 
         if (false === $object->exists()) {
-            return true;
+            UnableToDeleteFile::atLocation($path);
         }
 
         $object->delete();
 
-        return !$object->exists();
+        if ($object->exists()) {
+            UnableToDeleteFile::atLocation($path);
+        }
     }
 
     /**
-     * Delete a directory.
-     *
-     * @param string $dirname
-     *
-     * @return bool
+     * @throws UnableToDeleteDirectory
+     * @throws FilesystemException
      */
-    public function deleteDir($dirname)
+    public function deleteDirectory(string $path): void
     {
-        $dirname = rtrim($dirname, '/').'/';
+        $dirname = rtrim($path, '/').'/';
 
-        if (false === $this->has($dirname)) {
-            return false;
+        if (false === $this->fileExists($dirname)) {
+            throw UnableToDeleteDirectory::atLocation($path, 'Directory doesnt exist');
         }
 
         $dirname = $this->applyPathPrefix($dirname);
 
         $this->bucket->object($dirname)->delete();
 
-        return !$this->bucket->object($dirname)->exists();
+        if ($this->bucket->object($dirname)->exists()) {
+            throw UnableToDeleteDirectory::atLocation($path, 'Unable to delete');
+        }
     }
 
     /**
-     * Create a directory.
-     *
-     * @param string $dirname directory name
-     *
-     * @return array|false
+     * @throws UnableToCreateDirectory
+     * @throws FilesystemException
      */
-    public function createDir($dirname, Config $config)
+    public function createDirectory(string $path, Config $config): void
     {
-        $path = $this->applyPathPrefix($dirname);
+        $path = $this->applyPathPrefix($path);
         $path = rtrim($path, '/').'/';
 
-        $object = $this->bucket->upload('', ['name' => $path]);
-
-        return $this->convertObjectInfo($object);
+        $this->bucket->upload('', ['name' => $path]);
     }
 
     /**
-     * Set the visibility for a file.
-     *
-     * @param string $path
-     * @param string $visibility
-     *
-     * @return array|false file meta data
+     * @throws InvalidVisibilityProvided
+     * @throws FilesystemException
      */
-    public function setVisibility($path, $visibility)
+    public function setVisibility(string $path, string $visibility): void
     {
         $path = $this->applyPathPrefix($path);
         $object = $this->bucket->object($path);
 
         switch (true) {
-            case AdapterInterface::VISIBILITY_PUBLIC === $visibility:
+            case Visibility::PUBLIC === $visibility:
                 $object->acl()->add('allUsers', Acl::ROLE_READER);
                 break;
-            case AdapterInterface::VISIBILITY_PRIVATE === $visibility:
+            case Visibility::PRIVATE === $visibility:
                 $object->acl()->delete('allUsers');
                 break;
             default:
@@ -272,18 +239,12 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
         }
 
         $object->reload();
-
-        return $this->convertObjectInfo($object);
     }
 
     /**
-     * Check whether a file exists.
-     *
-     * @param string $path
-     *
-     * @return array|bool|null
+     * @throws FilesystemException
      */
-    public function has($path)
+    public function fileExists(string $path): bool
     {
         $path = $this->applyPathPrefix($path);
         $object = $this->bucket->object($path);
@@ -298,13 +259,10 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
     }
 
     /**
-     * Read a file.
-     *
-     * @param string $path
-     *
-     * @return array|false
+     * @throws UnableToReadFile
+     * @throws FilesystemException
      */
-    public function read($path)
+    public function read(string $path): string
     {
         $path = $this->applyPathPrefix($path);
 
@@ -312,20 +270,17 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
 
         $contents = $object->downloadAsString();
 
-        return compact('path', 'contents');
+        return $contents;
     }
 
     /**
-     * List contents of a directory.
+     * @return iterable<StorageAttributes>
      *
-     * @param string $directory
-     * @param bool   $recursive
-     *
-     * @return array
+     * @throws FilesystemException
      */
-    public function listContents($directory = '', $recursive = false)
+    public function listContents(string $path, bool $deep): iterable
     {
-        $directory = $this->applyPathPrefix($directory);
+        $directory = $this->applyPathPrefix($path);
 
         $objects = $this->bucket->objects(
             [
@@ -333,24 +288,23 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
             ]
         );
 
-        $contents = [];
-        foreach ($objects as $apiObject) {
-            if (null !== $apiObject) {
-                $contents[] = $this->convertObjectInfo($apiObject);
+        /** @var StorageObject $gcsObject */
+        foreach ($objects as $gcsObject) {
+            if (false === str_starts_with($gcsObject->name(), $directory . '/')) {
+                continue;
             }
-        }
 
-        // if directory, skip the directory object
-        // if directory, truncate prefix + delimiter
-        if ('' !== $directory) {
-            foreach ($contents as $idx => $objectInfo) {
-                if ('dir' === $objectInfo['type'] && $objectInfo['path'] === $directory) {
-                    $contents[$idx] = false;
+            if (false === $deep) {
+                // dont list nested objects
+                $name = $gcsObject->name();
+                $strippedName = substr($name, strlen($directory) + 1);
+                if (strpos($strippedName, '/') !== strlen($strippedName) -1) {
+                    continue;
                 }
             }
-        }
 
-        return array_filter($contents);
+            yield $this->convertObjectInfo($gcsObject);
+        }
     }
 
     /**
@@ -358,79 +312,92 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
      *
      * @param string $path
      *
-     * @return array|false
+     * @return StorageAttributes
      */
-    public function getMetadata($path)
+    public function getMetadata($path): StorageAttributes
     {
         $path = $this->applyPathPrefix($path);
 
         $object = $this->bucket->object($path);
 
         if (!$object->exists()) {
-            return false;
+            // todo: throw
+            // throw UnableToRetrieveMetadata::create($path, null);
         }
 
         return $this->convertObjectInfo($object);
     }
 
     /**
-     * Get all the meta data of a file or directory.
+     * Get all the meta data of a file.
      *
      * @param string $path
      *
-     * @return array|false
+     * @return StorageAttributes
      */
-    public function getSize($path)
-    {
-        return $this->getMetadata($path);
-    }
-
-    /**
-     * Get the mimetype of a file.
-     *
-     * @param string $path
-     *
-     * @return array|false
-     */
-    public function getMimetype($path)
-    {
-        return $this->getMetadata($path);
-    }
-
-    /**
-     * Get the timestamp of a file.
-     *
-     * @param string $path
-     *
-     * @return array|false
-     */
-    public function getTimestamp($path)
-    {
-        return $this->getMetadata($path);
-    }
-
-    /**
-     * Get the visibility of a file.
-     *
-     * @param string $path
-     *
-     * @return array|false
-     */
-    public function getVisibility($path)
+    public function getFileMetadata($path): FileAttributes
     {
         $path = $this->applyPathPrefix($path);
 
-        try {
-            $allUsersAcl = $this->bucket->object($path)->acl()->get(['entity' => 'allUsers']);
+        $object = $this->bucket->object($path);
 
-            if (Acl::ROLE_READER === $allUsersAcl['role']) {
-                return ['path' => $path, 'visibility' => AdapterInterface::VISIBILITY_PUBLIC];
-            }
-        } catch (NotFoundException $e) {
-            return ['path' => $path, 'visibility' => AdapterInterface::VISIBILITY_PRIVATE];
+        if (!$object->exists()) {
+            // todo: throw
+            // throw UnableToRetrieveMetadata::create($path, null);
+        }
+
+        $objectInfo = $this->convertObjectInfo($object);
+        if ($objectInfo->isDir()) {
+            // todo: throw
+        }
+
+        return $objectInfo;
+    }
+
+    /**
+     * @throws UnableToRetrieveMetadata
+     * @throws FilesystemException
+     */
+    public function fileSize(string $path): FileAttributes
+    {
+        return $this->getFileMetadata($path);
+    }
+
+    /**
+     * @throws UnableToRetrieveMetadata
+     * @throws FilesystemException
+     */
+    public function mimeType(string $path): FileAttributes
+    {
+        return $this->getFileMetadata($path);
+    }
+
+    /**
+     * @throws UnableToRetrieveMetadata
+     * @throws FilesystemException
+     */
+    public function lastModified(string $path): FileAttributes
+    {
+        return $this->getFileMetadata($path);
+    }
+
+    /**
+     * @throws UnableToRetrieveMetadata
+     * @throws FilesystemException
+     */
+    public function visibility(string $path): FileAttributes
+    {
+        $path = $this->applyPathPrefix($path);
+
+        $allUsersAcl = $this->bucket->object($path)->acl()->get(['entity' => 'allUsers']);
+
+        if (Acl::ROLE_READER === $allUsersAcl['role']) {
+            return ['path' => $path, 'visibility' => AdapterInterface::VISIBILITY_PUBLIC];
         }
 
         return ['path' => $path, 'visibility' => AdapterInterface::VISIBILITY_PRIVATE];
+
+        return FileAttributes::fromArray();
     }
 
     /**
@@ -446,37 +413,48 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
     /**
      * @param $object StorageObject
      *
-     * @return array
+     * @return StorageAttributes
      */
-    protected function convertObjectInfo($object)
+    protected function convertObjectInfo(StorageObject $object): StorageAttributes
     {
         $identity = $object->identity();
         $objectInfo = $object->info();
         $objectName = $identity['object'];
 
         // determine whether it's a file or a directory
-        $type = 'file';
+        $type = StorageAttributes::TYPE_FILE;
         $objectNameLength = \strlen($objectName);
         if (strpos($objectName, '/', $objectNameLength - 1)) {
-            $type = 'dir';
+            $type = StorageAttributes::TYPE_FILE;
         }
 
         $normalizedObjectInfo = [
-            'type' => $type,
-            'path' => $objectName,
+            StorageAttributes::ATTRIBUTE_TYPE => $type,
+            StorageAttributes::ATTRIBUTE_PATH => $objectName,
+            StorageAttributes::ATTRIBUTE_FILE_SIZE => 0,
+            StorageAttributes::ATTRIBUTE_MIME_TYPE => null,
+            StorageAttributes::ATTRIBUTE_LAST_MODIFIED => null,
+            StorageAttributes::ATTRIBUTE_EXTRA_METADATA => [],
         ];
 
-        // timestamp
-        $datetime = \DateTime::createFromFormat('Y-m-d\TH:i:s+', $objectInfo['updated']);
-        $normalizedObjectInfo['timestamp'] = $datetime->getTimestamp();
+        $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_LAST_MODIFIED] = DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s+', $objectInfo['updated'])->getTimestamp();
 
-        // size when file
         if ('file' === $type) {
-            $normalizedObjectInfo['size'] = $objectInfo['size'];
-            $normalizedObjectInfo['mimetype'] = $objectInfo['contentType'] ?? null;
+            $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_FILE_SIZE] = (int) $objectInfo['size'];
+            $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_MIME_TYPE] = $objectInfo['contentType'] ?? null;
         }
 
-        return $normalizedObjectInfo;
+        $path1 = $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_PATH];
+
+        /** @todo set real visibility */
+        $visibility = null;
+        $lastModified = $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_LAST_MODIFIED];
+        $size = $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_FILE_SIZE];
+        $mimeType = $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_MIME_TYPE];
+
+        return $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_TYPE] === StorageAttributes::TYPE_DIRECTORY
+            ? new DirectoryAttributes($path1, $visibility, $lastModified)
+            : new FileAttributes($path1, $size, $visibility, $lastModified, $mimeType);
     }
 
     /**
@@ -490,12 +468,12 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
     {
         $options = [];
 
-        if ($config->has('visibility')) {
+        if ($config->get('visibility') !== null) {
             switch (true) {
-                case AdapterInterface::VISIBILITY_PUBLIC === $config->get('visibility'):
+                case Visibility::PUBLIC === $config->get('visibility'):
                     $options['predefinedAcl'] = static::GCS_VISIBILITY_PUBLIC_READ;
                     break;
-                case AdapterInterface::VISIBILITY_PRIVATE === $config->get('visibility'):
+                case Visibility::PRIVATE === $config->get('visibility'):
                 default:
                     $options['predefinedAcl'] = static::GCS_VISIBILITY_PROJECT_PRIVATE;
                     break;
@@ -546,5 +524,16 @@ class GoogleCloudStorageAdapter extends AbstractAdapter implements CanOverwriteF
         ];
         $pieces = array_filter($pieces);
         $this->baseUrl = implode('/', $pieces);
+    }
+
+    /**
+     * @return resource
+     *
+     * @throws UnableToReadFile
+     * @throws FilesystemException
+     */
+    public function readStream(string $path)
+    {
+        // TODO: Implement readStream() method.
     }
 }
