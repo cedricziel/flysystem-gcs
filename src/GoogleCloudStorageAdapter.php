@@ -546,6 +546,11 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function readStream(string $path)
     {
-        // TODO: Implement readStream() method.
+        $path = $this->applyPathPrefix($path);
+
+        $storageObject = $this->bucket->object($path);
+        if (!$storageObject->exists()) {
+            throw UnableToReadFile::fromLocation($path);
+        }
     }
 }
