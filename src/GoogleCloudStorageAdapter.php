@@ -552,5 +552,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
         if (!$storageObject->exists()) {
             throw UnableToReadFile::fromLocation($path);
         }
+
+        return $storageObject->downloadAsStream()->detach();
     }
 }
