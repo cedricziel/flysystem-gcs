@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace CedricZiel\FlysystemGcs;
 
 use DateTimeImmutable;
-use Google\Cloud\Core\Exception\NotFoundException;
 use Google\Cloud\Storage\Acl;
 use Google\Cloud\Storage\Bucket;
 use Google\Cloud\Storage\StorageClient;
@@ -16,6 +15,7 @@ use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\InvalidVisibilityProvided;
+use League\Flysystem\PathPrefixer;
 use League\Flysystem\StorageAttributes;
 use League\Flysystem\UnableToCopyFile;
 use League\Flysystem\UnableToCreateDirectory;
@@ -24,8 +24,10 @@ use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
+use League\Flysystem\UnableToSetVisibility;
 use League\Flysystem\UnableToWriteFile;
 use League\Flysystem\Visibility;
+use League\MimeTypeDetection\ExtensionMimeTypeDetector;
 
 /**
  * Flysystem Adapter for Google Cloud Storage.
@@ -39,7 +41,7 @@ use League\Flysystem\Visibility;
  * @todo Use PathPrefixer
  * @todo implement visibility
  */
-class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements FilesystemAdapter
+class GoogleCloudStorageAdapter implements FilesystemAdapter
 {
     /**
      * ACL that grants access to everyone on the project.
@@ -72,6 +74,21 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
     private $storageClient;
 
     /**
+     * @var ExtensionMimeTypeDetector
+     */
+    private $mimeTypeDetector;
+
+    /**
+     * @var PathPrefixer
+     */
+    private $pathPrefixer;
+
+    /**
+     * @var string|null path prefix
+     */
+    protected $pathPrefix;
+
+    /**
      * Either pass in a custom client, or have one created for you from the config
      * array.
      * Minimal $config array should be:
@@ -97,11 +114,14 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
 
         $this->bucket = $this->storageClient->bucket($config['bucket']);
 
+        $this->mimeTypeDetector = new ExtensionMimeTypeDetector();
         // The adapter can optionally use a prefix. If it's not set, the bucket root is used
-        if (\array_key_exists('prefix', $config)) {
-            $this->setPathPrefix($config['prefix']);
+        if (\array_key_exists('prefix', $config) && $config['prefix'] !== null) {
+            $this->pathPrefixer = new PathPrefixer($config['prefix']);
+            $this->pathPrefix = $config['prefix'];
         } else {
-            $this->setPathPrefix('');
+            $this->pathPrefixer = new PathPrefixer('');
+            $this->pathPrefix = '';
         }
 
         $this->prepareBaseUrl($config);
@@ -129,7 +149,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function writeStream(string $path, $contents, Config $config): void
     {
-       $this->writeObject($path, $contents, $config);
+        $this->writeObject($path, $contents, $config);
     }
 
     /**
@@ -138,16 +158,16 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function move(string $source, string $destination, Config $config): void
     {
-        $statusCopy = $this->copy($source, $destination);
-        $statusRemoveOld = $this->delete($source);
+        $source = $this->pathPrefixer->prefixPath($source);
+        $destination = $this->pathPrefixer->prefixPath($destination);
 
-        if (!$statusCopy) {
+        $sourceStorageObject = $this->bucket->object($source);
+        if (!$sourceStorageObject->exists()) {
             throw UnableToMoveFile::fromLocationTo($source, $destination);
         }
 
-        if (!$statusRemoveOld) {
-            throw UnableToMoveFile::fromLocationTo($source, $destination);
-        }
+        $this->copy($source, $destination, new Config([]));
+        $this->delete($source);
     }
 
     /**
@@ -156,12 +176,14 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function copy(string $source, string $destination, Config $config): void
     {
-        $path = $this->applyPathPrefix($source);
-        $newpath = $this->applyPathPrefix($destination);
+        $sourcePath = $this->pathPrefixer->prefixPath($source);
+        $destinationPath = $this->pathPrefixer->prefixPath($destination);
 
-        $this->bucket
-            ->object($path)
-            ->copy($this->bucket, ['name' => $newpath]);
+        $object = $this->bucket->object($sourcePath);
+
+        $copiedObject = $object->copy($this->bucket, ['name' => $destinationPath]);
+        $copiedObject->reload();
+        $storageObject = $copiedObject->exists();
     }
 
     /**
@@ -170,7 +192,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function delete(string $path): void
     {
-        $path = $this->applyPathPrefix($path);
+        $path = $this->pathPrefixer->prefixPath($path);
         $object = $this->bucket->object($path);
 
         if (false === $object->exists()) {
@@ -190,17 +212,21 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function deleteDirectory(string $path): void
     {
-        $dirname = rtrim($path, '/').'/';
+        $dirname = rtrim($path, '/') . '/';
 
-        if (false === $this->fileExists($dirname)) {
-            throw UnableToDeleteDirectory::atLocation($path, 'Directory doesnt exist');
+        $dirname = $this->pathPrefixer->prefixPath($dirname);
+
+        $this->bucket->objects(['prefix' => $dirname]);
+
+        $storageObject = $this->bucket->object($dirname);
+        if (!$storageObject->exists()) {
+            throw UnableToDeleteDirectory::atLocation($dirname, 'Directory doesnt exist');
         }
 
-        $dirname = $this->applyPathPrefix($dirname);
+        $storageObject->delete();
 
-        $this->bucket->object($dirname)->delete();
-
-        if ($this->bucket->object($dirname)->exists()) {
+        $storageObject = $this->bucket->object($dirname);
+        if ($storageObject->exists()) {
             throw UnableToDeleteDirectory::atLocation($path, 'Unable to delete');
         }
     }
@@ -211,8 +237,8 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function createDirectory(string $path, Config $config): void
     {
-        $path = $this->applyPathPrefix($path);
-        $path = rtrim($path, '/').'/';
+        $path = $this->pathPrefixer->prefixPath($path);
+        $path = rtrim($path, '/') . '/';
 
         $this->bucket->upload('', ['name' => $path]);
     }
@@ -223,8 +249,12 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function setVisibility(string $path, string $visibility): void
     {
-        $path = $this->applyPathPrefix($path);
+        $path = $this->pathPrefixer->prefixPath($path);
         $object = $this->bucket->object($path);
+
+        if (!$object->exists()) {
+            throw UnableToSetVisibility::atLocation($path, 'Object doesnt exist');
+        }
 
         switch (true) {
             case Visibility::PUBLIC === $visibility:
@@ -246,10 +276,10 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function fileExists(string $path): bool
     {
-        $path = $this->applyPathPrefix($path);
-        $object = $this->bucket->object($path);
+        $path = $this->pathPrefixer->prefixPath($path);
+        $storageObject = $this->bucket->object($path);
 
-        if ($object->exists()) {
+        if ($storageObject->exists()) {
             return true;
         }
 
@@ -264,13 +294,14 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function read(string $path): string
     {
-        $path = $this->applyPathPrefix($path);
+        $path = $this->pathPrefixer->prefixPath($path);
 
         $object = $this->bucket->object($path);
+        if (!$object->exists()) {
+            throw UnableToReadFile::fromLocation($path);
+        }
 
-        $contents = $object->downloadAsString();
-
-        return $contents;
+        return $object->downloadAsString();
     }
 
     /**
@@ -280,7 +311,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function listContents(string $path, bool $deep): iterable
     {
-        $directory = $this->applyPathPrefix($path);
+        $directory = $this->pathPrefixer->prefixPath($path);
 
         $objects = $this->bucket->objects(
             [
@@ -290,15 +321,11 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
 
         /** @var StorageObject $gcsObject */
         foreach ($objects as $gcsObject) {
-            if (false === str_starts_with($gcsObject->name(), $directory . '/')) {
-                continue;
-            }
-
             if (false === $deep) {
                 // dont list nested objects
                 $name = $gcsObject->name();
                 $strippedName = substr($name, strlen($directory) + 1);
-                if (strpos($strippedName, '/') !== strlen($strippedName) -1) {
+                if (strpos($strippedName, '/') !== strlen($strippedName) - 1) {
                     continue;
                 }
             }
@@ -316,7 +343,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function getMetadata($path): StorageAttributes
     {
-        $path = $this->applyPathPrefix($path);
+        $path = $this->pathPrefixer->prefixPath($path);
 
         $object = $this->bucket->object($path);
 
@@ -337,13 +364,12 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function getFileMetadata($path): FileAttributes
     {
-        $path = $this->applyPathPrefix($path);
-
         $object = $this->bucket->object($path);
-
         if (!$object->exists()) {
             throw UnableToRetrieveMetadata::create($path, FileAttributes::ATTRIBUTE_TYPE);
         }
+
+        $detectMimeTypeFromFile = $this->mimeTypeDetector->detectMimeTypeFromFile($path);
 
         $objectInfo = $this->convertObjectInfo($object);
         if ($objectInfo->isDir()) {
@@ -359,7 +385,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function fileSize(string $path): FileAttributes
     {
-        $path = $this->applyPathPrefix($path);
+        $path = $this->pathPrefixer->prefixPath($path);
 
         $storageObject = $this->bucket->object($path);
         if (!$storageObject->exists()) {
@@ -380,14 +406,19 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function mimeType(string $path): FileAttributes
     {
-        $path = $this->applyPathPrefix($path);
+        $path = $this->pathPrefixer->prefixPath($path);
 
         $storageObject = $this->bucket->object($path);
         if (!$storageObject->exists()) {
             throw UnableToRetrieveMetadata::mimeType($path);
         }
 
-        return $this->getFileMetadata($path);
+        $mimeType = $this->mimeTypeDetector->detectMimeTypeFromFile($path);
+        if ($mimeType === null) {
+            throw UnableToRetrieveMetadata::mimeType($path, error_get_last()['message'] ?? '');
+        }
+
+        return new FileAttributes($path, null, null, null, $mimeType);
     }
 
     /**
@@ -396,7 +427,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function lastModified(string $path): FileAttributes
     {
-        $path = $this->applyPathPrefix($path);
+        $path = $this->pathPrefixer->prefixPath($path);
 
         $storageObject = $this->bucket->object($path);
         if (!$storageObject->exists()) {
@@ -412,7 +443,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function visibility(string $path): FileAttributes
     {
-        $path = $this->applyPathPrefix($path);
+        $path = $this->pathPrefixer->prefixPath($path);
 
         $storageObject = $this->bucket->object($path);
         if (!$storageObject->exists()) {
@@ -457,7 +488,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
 
         $normalizedObjectInfo = [
             StorageAttributes::ATTRIBUTE_TYPE => $type,
-            StorageAttributes::ATTRIBUTE_PATH => $objectName,
+            StorageAttributes::ATTRIBUTE_PATH => $this->pathPrefixer->stripPrefix($objectName),
             StorageAttributes::ATTRIBUTE_FILE_SIZE => 0,
             StorageAttributes::ATTRIBUTE_MIME_TYPE => null,
             StorageAttributes::ATTRIBUTE_LAST_MODIFIED => null,
@@ -467,7 +498,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
         $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_LAST_MODIFIED] = DateTimeImmutable::createFromFormat('Y-m-d\TH:i:s+', $objectInfo['updated'])->getTimestamp();
 
         if ('file' === $type) {
-            $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_FILE_SIZE] = (int) $objectInfo['size'];
+            $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_FILE_SIZE] = (int)$objectInfo['size'];
             $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_MIME_TYPE] = $objectInfo['contentType'] ?? null;
         }
 
@@ -480,7 +511,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
         $mimeType = $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_MIME_TYPE];
 
         return $normalizedObjectInfo[StorageAttributes::ATTRIBUTE_TYPE] === StorageAttributes::TYPE_DIRECTORY
-            ? new DirectoryAttributes($path1, $visibility, $lastModified)
+            ? new DirectoryAttributes(rtrim($path1, '/'), $visibility, $lastModified)
             : new FileAttributes($path1, $size, $visibility, $lastModified, $mimeType);
     }
 
@@ -513,14 +544,14 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
     /**
      * Writes an object to the current.
      *
-     * @param string          $path
+     * @param string $path
      * @param string|resource $contents
      *
      * @return array
      */
     protected function writeObject($path, $contents, Config $config)
     {
-        $path = $this->applyPathPrefix($path);
+        $path = $this->pathPrefixer->prefixPath($path);
         $metadata = [
             'name' => $path,
         ];
@@ -561,7 +592,7 @@ class GoogleCloudStorageAdapter extends LegacyFlysystemAdapter implements Filesy
      */
     public function readStream(string $path)
     {
-        $path = $this->applyPathPrefix($path);
+        $path = $this->pathPrefixer->prefixPath($path);
 
         $storageObject = $this->bucket->object($path);
         if (!$storageObject->exists()) {
